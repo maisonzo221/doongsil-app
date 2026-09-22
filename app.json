@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "doongsil-app",
+    "name": "둥실",
     "slug": "doongsil-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,7 +11,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#8FE3D8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +20,17 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#EAF7F6"
+        }
+      ]
+    ]
   }
 }

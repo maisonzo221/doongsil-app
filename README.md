@@ -37,6 +37,22 @@ src/
   theme.ts      컬러/타이포/스페이싱 토큰
 ```
 
+## 브랜드 에셋 (앱 아이콘 / 스플래시)
+
+`assets/`의 아이콘·스플래시는 `.brand-gen/`의 스크립트로 생성했습니다. 물방울 모티프(둥실)를
+민트→하늘색 그라데이션으로 표현한 로고마크이며, 색이나 구도를 바꾸고 싶으면 `brand.html`의
+색상/좌표 값을 수정한 뒤 다시 생성하면 됩니다.
+
+```bash
+node .brand-gen/generate.js
+```
+
+- `icon.png` — 앱 아이콘 (1024×1024, 그라데이션 배경 + 흰 물방울)
+- `android-icon-foreground/background/monochrome.png` — 안드로이드 어댑티브 아이콘 3종
+- `favicon.png` — 웹 파비콘
+- `splash-icon.png` — 스플래시 로고 + "둥실" 워드마크 (투명 배경, `app.json`의
+  `expo-splash-screen` 플러그인이 `#EAF7F6` 배경 위에 중앙 배치)
+
 ## 의도적으로 제외한 기능 (MVP 범위 밖)
 
 - SWOLF, 스트로크 효율 등 스포츠과학 스탯

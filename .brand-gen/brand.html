@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: 'Jua';
+    src: url('../node_modules/@expo-google-fonts/jua/400Regular/Jua_400Regular.ttf') format('truetype');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    background: transparent;
+    overflow: hidden;
+  }
+  .stage {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  svg { display: block; }
+  .wordmark {
+    position: absolute;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'Jua', sans-serif;
+    color: #2E86C7;
+    font-weight: 400;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage"></div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const variant = params.get('variant') || 'icon';
+    const size = Number(params.get('size') || 1024);
+    const stage = document.getElementById('stage');
+    const debugBg = params.get('debugbg');
+    if (debugBg) document.body.style.background = debugBg;
+
+    // Brand colors
+    const GRAD_FROM = '#8FE3D8'; // mint
+    const GRAD_TO = '#2E86C7';   // deep sky blue
+    const MARK_FROM = '#6FC6EC';
+    const MARK_TO = '#2E86C7';
+
+    // Drop path lives in a 24x24 local box. Bounding box approx x:4..20 y:2..25 (center 12,13.5)
+    const DROP_D = 'M12 2C12 2 4 12.2 4 17a8 8 0 0 0 16 0c0-4.8-8-15-8-15z';
+
+    function dropTransform(cx, cy, heightUnits) {
+      const s = heightUnits / 23;
+      const tx = cx - 12 * s;
+      const ty = cy - 13.5 * s;
+      return `translate(${tx.toFixed(3)},${ty.toFixed(3)}) scale(${s.toFixed(4)})`;
+    }
+
+    function svgNS(tag) {
+      return document.createElementNS('http://www.w3.org/2000/svg', tag);
+    }
+
+    function buildDropGroup({ fillMain, fillCompanion, highlight, scaleAboutCenter }) {
+      const g = svgNS('g');
+      if (scaleAboutCenter && scaleAboutCenter !== 1) {
+        g.setAttribute('transform', `translate(50,50) scale(${scaleAboutCenter}) translate(-50,-50)`);
+      }
+
+      // companion (small) drop, lower-right, behind main
+      const companion = svgNS('path');
+      companion.setAttribute('d', DROP_D);
+      companion.setAttribute('transform', dropTransform(73, 67, 19));
+      companion.setAttribute('fill', fillCompanion);
+      companion.setAttribute('opacity', '0.9');
+      g.appendChild(companion);
+
+      // main drop
+      const main = svgNS('path');
+      main.setAttribute('d', DROP_D);
+      main.setAttribute('transform', dropTransform(46, 45, 48));
+      main.setAttribute('fill', fillMain);
+      g.appendChild(main);
+
+      if (highlight) {
+        // glossy highlight ellipse inside main drop
+        const ell = svgNS('ellipse');
+        ell.setAttribute('cx', '38');
+        ell.setAttribute('cy', '34');
+        ell.setAttribute('rx', '5.2');
+        ell.setAttribute('ry', '8');
+        ell.setAttribute('fill', '#FFFFFF');
+        ell.setAttribute('opacity', '0.4');
+        ell.setAttribute('transform', 'rotate(-18 38 34)');
+        g.appendChild(ell);
+      }
+
+      return g;
+    }
+
+    function makeSvg(size) {
+      const svg = svgNS('svg');
+      svg.setAttribute('width', String(size));
+      svg.setAttribute('height', String(size));
+      svg.setAttribute('viewBox', '0 0 100 100');
+      return svg;
+    }
+
+    if (variant === 'icon') {
+      const svg = makeSvg(size);
+      const defs = svgNS('defs');
+      const grad = svgNS('linearGradient');
+      grad.setAttribute('id', 'bg');
+      grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+      grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+      const s1 = svgNS('stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', GRAD_FROM);
+      const s2 = svgNS('stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', GRAD_TO);
+      grad.appendChild(s1); grad.appendChild(s2);
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+
+      const bg = svgNS('rect');
+      bg.setAttribute('x', '0'); bg.setAttribute('y', '0');
+      bg.setAttribute('width', '100'); bg.setAttribute('height', '100');
+      bg.setAttribute('fill', 'url(#bg)');
+      svg.appendChild(bg);
+
+      svg.appendChild(buildDropGroup({
+        fillMain: '#FFFFFF',
+        fillCompanion: '#EAFBF8',
+        highlight: true,
+        scaleAboutCenter: 1,
+      }));
+
+      stage.appendChild(svg);
+    }
+
+    if (variant === 'adaptive-bg') {
+      const svg = makeSvg(size);
+      const defs = svgNS('defs');
+      const grad = svgNS('linearGradient');
+      grad.setAttribute('id', 'bg');
+      grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+      grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+      const s1 = svgNS('stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', GRAD_FROM);
+      const s2 = svgNS('stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', GRAD_TO);
+      grad.appendChild(s1); grad.appendChild(s2);
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+      const bg = svgNS('rect');
+      bg.setAttribute('x', '0'); bg.setAttribute('y', '0');
+      bg.setAttribute('width', '100'); bg.setAttribute('height', '100');
+      bg.setAttribute('fill', 'url(#bg)');
+      svg.appendChild(bg);
+      stage.appendChild(svg);
+    }
+
+    if (variant === 'adaptive-fg') {
+      const svg = makeSvg(size);
+      svg.appendChild(buildDropGroup({
+        fillMain: '#FFFFFF',
+        fillCompanion: '#EAFBF8',
+        highlight: true,
+        scaleAboutCenter: 0.66,
+      }));
+      stage.appendChild(svg);
+    }
+
+    if (variant === 'monochrome') {
+      const svg = makeSvg(size);
+      svg.appendChild(buildDropGroup({
+        fillMain: '#FFFFFF',
+        fillCompanion: '#FFFFFF',
+        highlight: false,
+        scaleAboutCenter: 0.66,
+      }));
+      stage.appendChild(svg);
+    }
+
+    if (variant === 'mark') {
+      // colored mark on transparent bg (for favicon / splash)
+      const svg = makeSvg(size);
+      const defs = svgNS('defs');
+      const grad = svgNS('linearGradient');
+      grad.setAttribute('id', 'mark');
+      grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+      grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+      const s1 = svgNS('stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', MARK_FROM);
+      const s2 = svgNS('stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', MARK_TO);
+      grad.appendChild(s1); grad.appendChild(s2);
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+
+      svg.appendChild(buildDropGroup({
+        fillMain: 'url(#mark)',
+        fillCompanion: '#8FE3D8',
+        highlight: true,
+        scaleAboutCenter: 1,
+      }));
+      stage.appendChild(svg);
+    }
+
+    if (variant === 'splash') {
+      // Tall transparent canvas: mark + wordmark, for expo-splash-screen "image"
+      const w = Number(params.get('w') || 640);
+      const h = Number(params.get('h') || 760);
+      stage.style.width = w + 'px';
+      stage.style.height = h + 'px';
+      document.body.style.width = w + 'px';
+      document.body.style.height = h + 'px';
+
+      const markBox = document.createElement('div');
+      markBox.style.width = Math.round(w * 0.62) + 'px';
+      markBox.style.height = Math.round(w * 0.62) + 'px';
+
+      const svg = svgNS('svg');
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', '100%');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      const defs = svgNS('defs');
+      const grad = svgNS('linearGradient');
+      grad.setAttribute('id', 'mark');
+      grad.setAttribute('x1', '0%'); grad.setAttribute('y1', '0%');
+      grad.setAttribute('x2', '100%'); grad.setAttribute('y2', '100%');
+      const s1 = svgNS('stop'); s1.setAttribute('offset', '0%'); s1.setAttribute('stop-color', MARK_FROM);
+      const s2 = svgNS('stop'); s2.setAttribute('offset', '100%'); s2.setAttribute('stop-color', MARK_TO);
+      grad.appendChild(s1); grad.appendChild(s2);
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+      svg.appendChild(buildDropGroup({
+        fillMain: 'url(#mark)',
+        fillCompanion: '#8FE3D8',
+        highlight: true,
+        scaleAboutCenter: 1,
+      }));
+      markBox.appendChild(svg);
+
+      const col = document.createElement('div');
+      col.style.display = 'flex';
+      col.style.flexDirection = 'column';
+      col.style.alignItems = 'center';
+      col.appendChild(markBox);
+
+      const word = document.createElement('div');
+      word.className = 'wordmark';
+      word.style.position = 'static';
+      word.style.marginTop = Math.round(w * 0.06) + 'px';
+      word.style.fontSize = Math.round(w * 0.135) + 'px';
+      word.textContent = '둥실';
+      col.appendChild(word);
+
+      stage.style.flexDirection = 'column';
+      stage.appendChild(col);
+    }
+  </script>
+</body>
+</html>
