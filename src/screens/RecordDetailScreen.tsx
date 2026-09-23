@@ -18,9 +18,9 @@ import { colors, fonts, radius, spacing } from '../theme';
 import { deleteRecord, getAllRecords, updateRecord } from '../storage/records';
 import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
 import { formatDateLabel } from '../utils/date';
-import { DiaryStackParamList } from '../navigation/types';
+import { CalendarStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<DiaryStackParamList, 'RecordDetail'>;
+type Props = NativeStackScreenProps<CalendarStackParamList, 'RecordDetail'>;
 
 export default function RecordDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;

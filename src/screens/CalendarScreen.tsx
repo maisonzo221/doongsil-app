@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useFocusEffect } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import '../utils/calendarLocale';
 import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
@@ -13,9 +14,12 @@ import { getAllRecords } from '../storage/records';
 import { computeStreak } from '../utils/streak';
 import { monthlySummary, totalDistanceLabel } from '../utils/summary';
 import { currentYearMonth, formatMonthLabel, formatDateLabel, todayString } from '../utils/date';
+import { CalendarStackParamList } from '../navigation/types';
 
 const RECENT_COUNT = 5;
 const MAX_DOTS_PER_DAY = 3;
+
+type Props = NativeStackScreenProps<CalendarStackParamList, 'CalendarHome'>;
 
 function todayHeaderParts() {
   const now = new Date();
@@ -28,7 +32,7 @@ function todayHeaderParts() {
   };
 }
 
-export default function CalendarScreen() {
+export default function CalendarScreen({ navigation }: Props) {
   const [records, setRecords] = useState<SwimRecord[]>([]);
   const [visibleMonth, setVisibleMonth] = useState(currentYearMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -180,7 +184,14 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
             {selectedRecords.map((r) => (
-              <RecordCard key={r.id} record={r} />
+              <RecordCard
+                key={r.id}
+                record={r}
+                onPress={() => {
+                  setSelectedDate(null);
+                  navigation.navigate('RecordDetail', { id: r.id });
+                }}
+              />
             ))}
           </View>
         </View>
