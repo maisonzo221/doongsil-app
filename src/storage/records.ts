@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from 'expo-sqlite/kv-store';
 import { SwimRecord, SwimRecordInput } from '../types';
 
 const RECORDS_KEY = '@doongsil/records';
