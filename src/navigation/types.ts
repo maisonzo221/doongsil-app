@@ -7,5 +7,6 @@ export type RootTabParamList = {
   Noting: undefined;
   Calendar: undefined;
   Diary: undefined;
+  SwimFriends: undefined;
   Shop: undefined;
 };

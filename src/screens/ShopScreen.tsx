@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, radius, spacing } from '../theme';
 
 const COMING_SOON_ITEMS = [
   { emoji: '\u{1F3CA}', label: '둥실 물안경' },
@@ -39,7 +39,7 @@ export default function ShopScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xl },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm },
   banner: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -48,25 +48,25 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   bannerEmoji: { fontSize: 40, marginBottom: spacing.sm },
-  bannerTitle: { fontSize: 17, fontWeight: '800', color: colors.text, marginBottom: 4 },
-  bannerSubtitle: { color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
-  sectionTitle: { fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  bannerTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text, marginBottom: 4 },
+  bannerSubtitle: { color: colors.textMuted, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 20 },
+  sectionTitle: { fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.xs },
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
     opacity: 0.7,
   },
-  itemEmoji: { fontSize: 24, marginRight: spacing.md },
-  itemLabel: { flex: 1, color: colors.text, fontWeight: '600' },
+  itemEmoji: { fontSize: 24, marginRight: spacing.sm },
+  itemLabel: { flex: 1, color: colors.text, fontFamily: fonts.semibold },
   soonBadge: {
     backgroundColor: colors.cardSoft,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     paddingVertical: 4,
   },
-  soonBadgeText: { color: colors.primaryDark, fontSize: 11, fontWeight: '700' },
+  soonBadgeText: { color: colors.blueSea, fontSize: 11, fontFamily: fonts.enSemibold },
 });

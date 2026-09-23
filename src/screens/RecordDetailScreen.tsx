@@ -14,8 +14,9 @@ import ScreenBackground from '../components/ScreenBackground';
 import MoodPicker from '../components/MoodPicker';
 import StrokePicker from '../components/StrokePicker';
 import { Mood, Stroke, SwimRecord } from '../types';
-import { colors, radius, spacing } from '../theme';
+import { colors, fonts, radius, spacing } from '../theme';
 import { deleteRecord, getAllRecords, updateRecord } from '../storage/records';
+import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
 import { formatDateLabel } from '../utils/date';
 import { DiaryStackParamList } from '../navigation/types';
 
@@ -28,8 +29,11 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
+  const [calories, setCalories] = useState('');
+  const [avgHeartRate, setAvgHeartRate] = useState('');
   const [memo, setMemo] = useState('');
   const [condition, setCondition] = useState('');
+  const [source, setSource] = useState<'manual' | 'health'>('manual');
 
   useFocusEffect(
     useCallback(() => {
@@ -41,8 +45,11 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
           setStrokes(found.strokes);
           setDistance(found.distanceMeters ? String(found.distanceMeters) : '');
           setDuration(found.durationMinutes ? String(found.durationMinutes) : '');
+          setCalories(found.calories ? String(found.calories) : '');
+          setAvgHeartRate(found.avgHeartRate ? String(found.avgHeartRate) : '');
           setMemo(found.memo ?? '');
           setCondition(found.condition ?? '');
+          setSource(found.source);
         }
       });
     }, [id])
@@ -51,13 +58,17 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
   async function handleSave() {
     if (!record) return;
     await updateRecord(record.id, {
+      sport: record.sport,
       date: record.date,
       mood,
       strokes,
       distanceMeters: distance ? Number(distance) : undefined,
       durationMinutes: duration ? Number(duration) : undefined,
+      calories: calories ? Number(calories) : undefined,
+      avgHeartRate: avgHeartRate ? Number(avgHeartRate) : undefined,
       memo: memo.trim() || undefined,
       condition: condition.trim() || undefined,
+      source,
     });
     navigation.goBack();
   }
@@ -103,7 +114,10 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
               placeholder="거리(m)"
               placeholderTextColor={colors.textMuted}
               value={distance}
-              onChangeText={setDistance}
+              onChangeText={(v) => {
+                setDistance(v);
+                setSource('manual');
+              }}
             />
             <TextInput
               style={[styles.input, styles.halfInput]}
@@ -111,13 +125,56 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
               placeholder="시간(분)"
               placeholderTextColor={colors.textMuted}
               value={duration}
-              onChangeText={setDuration}
+              onChangeText={(v) => {
+                setDuration(v);
+                setSource('manual');
+              }}
+            />
+          </View>
+          <View style={[styles.row, styles.rowSpacingTop]}>
+            <TextInput
+              style={[styles.input, styles.halfInput]}
+              keyboardType="numeric"
+              placeholder="칼로리(kcal)"
+              placeholderTextColor={colors.textMuted}
+              value={calories}
+              onChangeText={(v) => {
+                setCalories(v);
+                setSource('manual');
+              }}
+            />
+            <TextInput
+              style={[styles.input, styles.halfInput]}
+              keyboardType="numeric"
+              placeholder="평균 심박수(bpm)"
+              placeholderTextColor={colors.textMuted}
+              value={avgHeartRate}
+              onChangeText={(v) => {
+                setAvgHeartRate(v);
+                setSource('manual');
+              }}
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>한줄 메모</Text>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>한줄 메모</Text>
+            <View style={styles.memoTools}>
+              <TouchableOpacity
+                style={styles.memoToolBtn}
+                onPress={() => setMemo((m) => toggleBoldWrap(m))}
+              >
+                <Text style={styles.memoToolBold}>B</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.memoToolBtn}
+                onPress={() => setMemo((m) => toggleBulletLine(m))}
+              >
+                <Text style={styles.memoToolText}>{'•'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
           <TextInput
             style={styles.textarea}
             multiline
@@ -150,34 +207,54 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: spacing.lg },
+  title: { fontSize: 22, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.lg },
   section: { marginBottom: spacing.lg },
-  sectionTitle: { fontWeight: '700', color: colors.text, fontSize: 15, marginBottom: spacing.sm },
-  row: { flexDirection: 'row', gap: spacing.sm },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
+  row: { flexDirection: 'row', gap: spacing.xs },
+  rowSpacingTop: { marginTop: spacing.xs },
   halfInput: { flex: 1 },
   input: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
     color: colors.text,
+    fontFamily: fonts.regular,
   },
+  memoTools: { flexDirection: 'row', gap: spacing.hairline },
+  memoToolBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    backgroundColor: colors.cardSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memoToolBold: { fontFamily: fonts.bold, color: colors.text, fontSize: 13 },
+  memoToolText: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
   textarea: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.sm,
     minHeight: 80,
     textAlignVertical: 'top',
     color: colors.text,
+    fontFamily: fonts.regular,
   },
   saveBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
-  saveBtnText: { color: colors.white, fontWeight: '800', fontSize: 16 },
-  deleteBtn: { alignItems: 'center', marginTop: spacing.md, paddingVertical: spacing.sm },
-  deleteBtnText: { color: '#D96C6C', fontWeight: '700' },
+  saveBtnText: { color: colors.white, fontFamily: fonts.bold, fontSize: 16 },
+  deleteBtn: { alignItems: 'center', marginTop: spacing.sm, paddingVertical: spacing.xs },
+  deleteBtnText: { color: '#D96C6C', fontFamily: fonts.semibold },
 });

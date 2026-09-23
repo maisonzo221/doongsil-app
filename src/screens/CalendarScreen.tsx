@@ -1,17 +1,32 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useFocusEffect } from '@react-navigation/native';
 import '../utils/calendarLocale';
 import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
 import RecordCard from '../components/RecordCard';
+import DailyOceanCard from '../components/DailyOceanCard';
 import { SwimRecord } from '../types';
-import { colors, moodColors, radius, spacing } from '../theme';
+import { colors, fonts, moodColors, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
 import { computeStreak } from '../utils/streak';
 import { monthlySummary, totalDistanceLabel } from '../utils/summary';
-import { currentYearMonth, formatDateLabel, formatMonthLabel } from '../utils/date';
+import { currentYearMonth, formatMonthLabel, formatDateLabel, todayString } from '../utils/date';
+
+const RECENT_COUNT = 5;
+const MAX_DOTS_PER_DAY = 3;
+
+function todayHeaderParts() {
+  const now = new Date();
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+  return {
+    year: now.getFullYear(),
+    day: now.getDate(),
+    month: now.getMonth() + 1,
+    weekday,
+  };
+}
 
 export default function CalendarScreen() {
   const [records, setRecords] = useState<SwimRecord[]>([]);
@@ -42,13 +57,27 @@ export default function CalendarScreen() {
   const streak = useMemo(() => computeStreak(records), [records]);
   const summary = useMemo(() => monthlySummary(monthRecords), [monthRecords]);
   const distanceLabel = useMemo(() => totalDistanceLabel(records), [records]);
+  const recentRecords = useMemo(() => records.slice(0, RECENT_COUNT), [records]);
 
   const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
+  const header = todayHeaderParts();
 
   return (
     <ScreenBackground>
-      <View style={styles.container}>
-        <Text style={styles.title}>캘린더</Text>
+      <ScrollView style={styles.container} contentContainerStyle={styles.containerContent}>
+        {/* 닌텐도 투데이 스타일 헤더 */}
+        <View style={styles.todayHeader}>
+          <Text style={styles.year}>{header.year}</Text>
+          <View style={styles.dateRow}>
+            <Text style={styles.bigDay}>{header.day}</Text>
+            <View style={styles.dateMeta}>
+              <Text style={styles.month}>{header.month}월</Text>
+              <Text style={styles.weekday}>{header.weekday}요일</Text>
+            </View>
+          </View>
+        </View>
+
+        <DailyOceanCard />
 
         <View style={styles.streakRow}>
           <View style={styles.dropsRow}>
@@ -70,51 +99,69 @@ export default function CalendarScreen() {
           </View>
         )}
 
-        <Calendar
-          current={`${visibleMonth}-01`}
-          monthFormat="yyyy년 M월"
-          onMonthChange={(m: DateData) => setVisibleMonth(m.dateString.slice(0, 7))}
-          onDayPress={(d: DateData) => {
-            if (recordsByDate.has(d.dateString)) setSelectedDate(d.dateString);
-          }}
-          theme={{
-            backgroundColor: 'transparent',
-            calendarBackground: 'transparent',
-            textSectionTitleColor: colors.textMuted,
-            monthTextColor: colors.text,
-            textMonthFontWeight: '800',
-            todayTextColor: colors.primaryDark,
-            arrowColor: colors.primaryDark,
-            dayTextColor: colors.text,
-            textDisabledColor: colors.border,
-          }}
-          dayComponent={({ date, state }: any) => {
-            if (!date) return <View />;
-            const dayRecords = recordsByDate.get(date.dateString) ?? [];
-            const topMood = dayRecords[0]?.mood;
-            return (
-              <TouchableOpacity
-                style={styles.dayCell}
-                onPress={() => dayRecords.length && setSelectedDate(date.dateString)}
-              >
-                <Text
-                  style={[
-                    styles.dayNumber,
-                    state === 'disabled' && { color: colors.border },
-                  ]}
+        <View style={styles.calendarCard}>
+          <Calendar
+            current={`${visibleMonth}-01`}
+            monthFormat="yyyy년 M월"
+            onMonthChange={(m: DateData) => setVisibleMonth(m.dateString.slice(0, 7))}
+            onDayPress={(d: DateData) => {
+              if (recordsByDate.has(d.dateString)) setSelectedDate(d.dateString);
+            }}
+            theme={{
+              backgroundColor: 'transparent',
+              calendarBackground: 'transparent',
+              textSectionTitleColor: colors.textMuted,
+              monthTextColor: colors.text,
+              textMonthFontWeight: '700',
+              todayTextColor: colors.blueSea,
+              arrowColor: colors.blueSea,
+              dayTextColor: colors.text,
+              textDisabledColor: colors.border,
+            }}
+            dayComponent={({ date, state }: any) => {
+              if (!date) return <View />;
+              const dayRecords = (recordsByDate.get(date.dateString) ?? []).slice(0, MAX_DOTS_PER_DAY);
+              const isToday = date.dateString === todayString();
+              return (
+                <TouchableOpacity
+                  style={styles.dayCell}
+                  onPress={() => dayRecords.length && setSelectedDate(date.dateString)}
                 >
-                  {date.day}
-                </Text>
-                {topMood && <WaterDrop color={moodColors[topMood]} size={12} />}
-              </TouchableOpacity>
-            );
-          }}
-        />
+                  <View style={[styles.dayNumberWrap, isToday && styles.dayNumberWrapToday]}>
+                    <Text
+                      style={[
+                        styles.dayNumber,
+                        isToday && styles.dayNumberToday,
+                        state === 'disabled' && { color: colors.border },
+                      ]}
+                    >
+                      {date.day}
+                    </Text>
+                  </View>
+                  <View style={styles.dotsRow}>
+                    {dayRecords.map((r) => (
+                      <View key={r.id} style={[styles.dot, { backgroundColor: moodColors[r.mood] }]} />
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        </View>
 
         <View style={styles.distanceCard}>
           <Text style={styles.distanceText}>{distanceLabel}</Text>
         </View>
-      </View>
+
+        {recentRecords.length > 0 && (
+          <View style={styles.recentSection}>
+            <Text style={styles.recentTitle}>최근 기록</Text>
+            {recentRecords.map((r) => (
+              <RecordCard key={r.id} record={r} />
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       <Modal
         visible={!!selectedDate}
@@ -133,7 +180,7 @@ export default function CalendarScreen() {
               </TouchableOpacity>
             </View>
             {selectedRecords.map((r) => (
-              <RecordCard key={r.id} record={r} onPress={() => {}} />
+              <RecordCard key={r.id} record={r} />
             ))}
           </View>
         </View>
@@ -143,37 +190,58 @@ export default function CalendarScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.lg },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  container: { flex: 1 },
+  containerContent: { padding: spacing.lg, paddingBottom: spacing.xl },
+  todayHeader: { marginBottom: spacing.sm },
+  year: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 13 },
+  dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs },
+  bigDay: { fontFamily: fonts.bold, color: colors.text, fontSize: 56, lineHeight: 58 },
+  dateMeta: { paddingBottom: 6 },
+  month: { fontFamily: fonts.bold, color: colors.text, fontSize: 20 },
+  weekday: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 13 },
   streakRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
   },
   dropsRow: { flexDirection: 'row', alignItems: 'center' },
-  streakText: { color: colors.text, fontWeight: '700' },
+  streakText: { color: colors.text, fontFamily: fonts.semibold },
   summaryCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  summaryMonth: { color: colors.primaryDark, fontWeight: '700', fontSize: 12 },
-  summaryText: { color: colors.text, marginTop: 4, fontSize: 14, lineHeight: 20 },
-  dayCell: { alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 2 },
-  dayNumber: { color: colors.text, fontSize: 14 },
+  summaryMonth: { color: colors.blueSea, fontFamily: fonts.bold, fontSize: 12 },
+  summaryText: { color: colors.text, marginTop: 4, fontSize: 14, lineHeight: 20, fontFamily: fonts.regular },
+  calendarCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  dayCell: { alignItems: 'center', justifyContent: 'center', paddingVertical: 4, gap: 3 },
+  dayNumberWrap: { width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13 },
+  dayNumberWrapToday: { backgroundColor: colors.primary },
+  dayNumber: { color: colors.text, fontSize: 14, fontFamily: fonts.medium },
+  dayNumberToday: { color: colors.white, fontFamily: fonts.bold },
+  dotsRow: { flexDirection: 'row', gap: 3, height: 6 },
+  dot: { width: 5, height: 5, borderRadius: 2.5 },
   distanceCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
-    padding: spacing.md,
-    marginTop: spacing.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
     alignItems: 'center',
   },
-  distanceText: { color: colors.primaryDark, fontWeight: '700', fontSize: 15 },
+  distanceText: { color: colors.blueSea, fontFamily: fonts.bold, fontSize: 15 },
+  recentSection: { marginTop: spacing.lg },
+  recentTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(44,74,82,0.35)',
+    backgroundColor: 'rgba(10,51,88,0.35)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
@@ -187,8 +255,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text },
-  modalClose: { color: colors.primaryDark, fontWeight: '700' },
+  modalTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
+  modalClose: { color: colors.blueSea, fontFamily: fonts.bold },
 });

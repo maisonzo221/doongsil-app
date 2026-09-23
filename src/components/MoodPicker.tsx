@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Mood, MOOD_ORDER } from '../types';
-import { colors, moodColors, moodEmoji, moodLabel, radius, spacing } from '../theme';
+import { colors, fonts, moodColors, moodEmoji, moodLabel, radius, spacing } from '../theme';
 
 interface Props {
   value: Mood;
@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   item: {
-    width: 52,
-    height: 52,
+    width: 56,
+    height: 56,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -56,8 +56,9 @@ const styles = StyleSheet.create({
   },
   label: {
     textAlign: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     color: colors.textMuted,
+    fontFamily: fonts.medium,
     fontSize: 13,
   },
 });

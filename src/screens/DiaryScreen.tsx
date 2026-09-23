@@ -5,7 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../components/ScreenBackground';
 import RecordCard from '../components/RecordCard';
 import { SwimRecord } from '../types';
-import { colors, spacing } from '../theme';
+import { colors, fonts, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
 import { DiaryStackParamList } from '../navigation/types';
 
@@ -47,8 +47,8 @@ export default function DiaryScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.lg },
-  title: { fontSize: 28, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  title: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm },
   list: { paddingBottom: spacing.xl },
   empty: { alignItems: 'center', marginTop: spacing.xl * 2 },
-  emptyText: { color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
+  emptyText: { color: colors.textMuted, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 22 },
 });
