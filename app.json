@@ -7,9 +7,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.doongsil",
+      "usesAppleSignIn": true
     },
     "android": {
+      "package": "app.doongsil",
       "adaptiveIcon": {
         "backgroundColor": "#8FE3D8",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -29,6 +32,20 @@
           "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#EAF7F6"
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "둥실이 예전 수영 친구를 수친으로 찾을 수 있도록 연락처 접근을 허용해주세요."
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "오늘의 수영 기록을 자동으로 불러오기 위해 애플 피트니스 데이터를 읽어요.",
+          "NSHealthUpdateUsageDescription": false
         }
       ]
     ]

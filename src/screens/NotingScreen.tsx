@@ -19,7 +19,7 @@ import { Mood, Stroke, SwimRecord } from '../types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { addRecord, deleteRecord, getAllRecords } from '../storage/records';
 import { getGoal, setGoal } from '../storage/goals';
-import { getTodayHealthImportMock } from '../services/appleHealthMock';
+import { getTodaySwimWorkout } from '../services/appleHealth';
 import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
 import { currentYearMonth, formatDateLabel, formatMonthLabel, todayString } from '../utils/date';
 
@@ -55,16 +55,17 @@ export default function NotingScreen() {
     }, [loadTodayRecords])
   );
 
-  // 오늘 기록이 아직 없으면, 애플 피트니스에서 불러온 것처럼(mock) 자동으로 채워준다.
-  // 실측이 아닐 수 있어서 값은 그대로 두되 사용자가 자유롭게 고칠 수 있다.
+  // 오늘 기록이 아직 없으면 애플 피트니스에서 오늘의 수영 운동을 불러와 채워준다.
+  // 실측이 부정확할 수 있어서 값은 그대로 두되 사용자가 자유롭게 고칠 수 있다.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      getAllRecords().then((all) => {
+      getAllRecords().then(async (all) => {
         if (cancelled) return;
         const hasToday = all.some((r) => r.date === todayString());
         if (!hasToday) {
-          const imported = getTodayHealthImportMock(todayString());
+          const imported = await getTodaySwimWorkout(todayString());
+          if (cancelled || !imported) return;
           setDistance(String(imported.distanceMeters));
           setDuration(String(imported.durationMinutes));
           setCalories(String(imported.calories));

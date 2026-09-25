@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import WaterDrop from '../components/WaterDrop';
 import AppleLogo from '../components/AppleLogo';
 import { colors, fonts, radius, spacing } from '../theme';
-import { continueAsGuest, mockSignInWithApple, mockSyncContacts, UserProfile } from '../storage/auth';
+import { continueAsGuest, signInWithApple, syncContacts, UserProfile } from '../storage/auth';
 
 interface Props {
   onAuthenticated: (user: UserProfile) => void;
@@ -18,10 +19,18 @@ export default function AuthScreen({ onAuthenticated }: Props) {
   async function handleAppleSignIn() {
     setLoading(true);
     try {
-      // Expo Go 데모용 가짜 로그인. 실제 기기 배포 시 expo-apple-authentication으로 교체.
-      const user = await mockSignInWithApple();
+      const available = await AppleAuthentication.isAvailableAsync();
+      if (!available) {
+        Alert.alert('Apple 로그인 불가', '이 기기에서는 Apple 로그인을 사용할 수 없어요.');
+        return;
+      }
+      const user = await signInWithApple();
       setPendingUser(user);
       setStep('contacts');
+    } catch (err: any) {
+      if (err?.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('로그인 실패', '다시 시도해주세요.');
+      }
     } finally {
       setLoading(false);
     }
@@ -39,8 +48,12 @@ export default function AuthScreen({ onAuthenticated }: Props) {
 
   async function handleAllowContacts() {
     if (!pendingUser) return;
-    await mockSyncContacts();
-    onAuthenticated({ ...pendingUser, contactsSynced: true });
+    try {
+      const { granted } = await syncContacts();
+      onAuthenticated({ ...pendingUser, contactsSynced: granted });
+    } catch {
+      onAuthenticated(pendingUser);
+    }
   }
 
   function handleSkipContacts() {
