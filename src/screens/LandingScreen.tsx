@@ -1,11 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
 import WaterDrop from '../components/WaterDrop';
 import { colors, fonts } from '../theme';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+// react-native-svg's web renderer doesn't support Animated.createAnimatedComponent(Path)
+// with a string-interpolated `d` (throws on every render), so the wave only animates
+// natively and falls back to a static path on web.
+const AnimatedPath = Platform.OS === 'web' ? Path : Animated.createAnimatedComponent(Path);
 
 interface Props {
   onFinish: () => void;
@@ -22,8 +25,11 @@ function Wave({ color, baseY, amplitude, speed, opacity }: {
   opacity: number;
 }) {
   const phase = useRef(new Animated.Value(0)).current;
+  const pathA = `M0,${baseY} C 100,${baseY - amplitude} 300,${baseY + amplitude} 400,${baseY} L400,400 L0,400 Z`;
+  const pathB = `M0,${baseY} C 100,${baseY + amplitude} 300,${baseY - amplitude} 400,${baseY} L400,400 L0,400 Z`;
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const loop = Animated.loop(
       Animated.timing(phase, {
         toValue: 1,
@@ -36,17 +42,15 @@ function Wave({ color, baseY, amplitude, speed, opacity }: {
     return () => loop.stop();
   }, [phase, speed]);
 
-  const d = phase.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      `M0,${baseY} C 100,${baseY - amplitude} 300,${baseY + amplitude} 400,${baseY} L400,400 L0,400 Z`,
-      `M0,${baseY} C 100,${baseY + amplitude} 300,${baseY - amplitude} 400,${baseY} L400,400 L0,400 Z`,
-    ],
-  });
+  const d = phase.interpolate({ inputRange: [0, 1], outputRange: [pathA, pathB] });
 
   return (
     <Svg width="100%" height="100%" viewBox="0 0 400 400" style={StyleSheet.absoluteFill}>
-      <AnimatedPath d={d as unknown as string} fill={color} opacity={opacity} />
+      {Platform.OS === 'web' ? (
+        <Path d={pathA} fill={color} opacity={opacity} />
+      ) : (
+        <AnimatedPath d={d as unknown as string} fill={color} opacity={opacity} />
+      )}
     </Svg>
   );
 }
