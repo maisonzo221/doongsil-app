@@ -6,6 +6,7 @@ export type CalendarStackParamList = {
 export type RootTabParamList = {
   Noting: undefined;
   Calendar: undefined;
-  SwimFriends: undefined;
+  Friends: undefined;
+  Groups: undefined;
   Shop: undefined;
 };

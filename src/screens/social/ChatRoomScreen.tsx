@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -13,23 +13,39 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../../theme';
-import { SocialStackParamList } from '../../navigation/socialTypes';
-import { ChatMessage, getMessages, sendTextMessage, shareRecordToGroup } from '../../storage/social';
+import { GroupsStackParamList } from '../../navigation/socialTypes';
+import {
+  ChatMessage,
+  Friend,
+  getGroupMembers,
+  getMessages,
+  sendTextMessage,
+  shareRecordToGroup,
+  subscribeToMessages,
+} from '../../storage/social';
 import { getAllRecords } from '../../storage/records';
+import { getCurrentUser } from '../../storage/auth';
 import { formatDateLabel } from '../../utils/date';
 import { STROKE_LABEL } from '../../types';
 
-type Props = NativeStackScreenProps<SocialStackParamList, 'ChatRoom'>;
-
-const ME = '나';
+type Props = NativeStackScreenProps<GroupsStackParamList, 'ChatRoom'>;
 
 export default function ChatRoomScreen({ route }: Props) {
   const { groupId, groupName } = route.params;
+  const [myId, setMyId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Record<string, Friend>>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
 
   const reload = useCallback(async () => {
-    setMessages(await getMessages(groupId));
+    const [user, memberList, messageList] = await Promise.all([
+      getCurrentUser(),
+      getGroupMembers(groupId),
+      getMessages(groupId),
+    ]);
+    setMyId(user?.id ?? null);
+    setMembers(Object.fromEntries(memberList.map((m) => [m.id, m])));
+    setMessages(messageList);
   }, [groupId]);
 
   useFocusEffect(
@@ -38,11 +54,17 @@ export default function ChatRoomScreen({ route }: Props) {
     }, [reload])
   );
 
+  useEffect(() => {
+    const unsubscribe = subscribeToMessages(groupId, (message) => {
+      setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+    });
+    return unsubscribe;
+  }, [groupId]);
+
   async function handleSend() {
     if (!draft.trim()) return;
-    await sendTextMessage(groupId, ME, draft.trim());
+    await sendTextMessage(groupId, draft.trim());
     setDraft('');
-    reload();
   }
 
   async function handleShareLatestRecord() {
@@ -53,8 +75,12 @@ export default function ChatRoomScreen({ route }: Props) {
     const summary = `${formatDateLabel(latest.date)} · ${strokes || '기록'}${
       latest.distanceMeters ? ` · ${latest.distanceMeters}m` : ''
     }`;
-    await shareRecordToGroup(groupId, ME, summary);
-    reload();
+    await shareRecordToGroup(groupId, summary);
+  }
+
+  function nicknameFor(senderId: string): string {
+    if (senderId === myId) return '나';
+    return members[senderId]?.nicknameKo ?? '알 수 없음';
   }
 
   return (
@@ -72,10 +98,10 @@ export default function ChatRoomScreen({ route }: Props) {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
-            const mine = item.senderName === ME;
+            const mine = item.senderId === myId;
             return (
               <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
-                {!mine && <Text style={styles.sender}>{item.senderName}</Text>}
+                {!mine && <Text style={styles.sender}>{nicknameFor(item.senderId)}</Text>}
                 <View style={[styles.bubble, mine && styles.bubbleMine]}>
                   {item.type === 'text' && (
                     <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.text}</Text>

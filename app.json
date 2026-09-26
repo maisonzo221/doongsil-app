@@ -3,6 +3,7 @@
     "name": "둥실",
     "slug": "doongsil-app",
     "version": "1.0.0",
+    "scheme": "doongsil",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
