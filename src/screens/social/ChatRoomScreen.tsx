@@ -233,12 +233,11 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
               renderItem={({ item }) => (
                 <View style={styles.memberRow}>
                   <View style={styles.memberNameRow}>
-                    <Text style={styles.memberName}>{item.nicknameKo}</Text>
-                    {item.id === ownerId && (
-                      <View style={styles.ownerBadge}>
-                        <Text style={styles.ownerBadgeText}>방장</Text>
-                      </View>
-                    )}
+                    <Text style={styles.memberName}>
+                      {item.nicknameKo}
+                      {item.id === myId ? ' (나)' : ''}
+                    </Text>
+                    {item.id === ownerId && <Text style={styles.ownerCrown}>👑</Text>}
                   </View>
                   {isOwner && item.id !== myId && (
                     <View style={styles.memberActions}>
@@ -343,13 +342,7 @@ const styles = StyleSheet.create({
   },
   memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
   memberName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 14 },
-  ownerBadge: {
-    backgroundColor: colors.cardSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.hairline,
-    paddingVertical: 2,
-  },
-  ownerBadgeText: { fontFamily: fonts.bold, color: colors.primary, fontSize: 10 },
+  ownerCrown: { fontSize: 13 },
   memberActions: { flexDirection: 'row', gap: spacing.sm },
   memberActionText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   memberActionTextDanger: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },

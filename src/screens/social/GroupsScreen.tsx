@@ -160,11 +160,7 @@ export default function GroupsScreen({ navigation, route }: Props) {
                 >
                   <View style={styles.groupNameRow}>
                     <Text style={styles.groupName}>{item.name}</Text>
-                    {item.ownerId === me?.id && (
-                      <View style={styles.ownerBadge}>
-                        <Text style={styles.ownerBadgeText}>방장</Text>
-                      </View>
-                    )}
+                    {item.ownerId === me?.id && <Text style={styles.ownerCrown}>👑</Text>}
                   </View>
                   <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
                 </TouchableOpacity>
@@ -278,13 +274,7 @@ const styles = StyleSheet.create({
   groupMain: { padding: spacing.sm },
   groupNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
   groupName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
-  ownerBadge: {
-    backgroundColor: colors.cardSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.hairline,
-    paddingVertical: 2,
-  },
-  ownerBadgeText: { fontFamily: fonts.bold, color: colors.primary, fontSize: 10 },
+  ownerCrown: { fontSize: 13 },
   groupCode: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
   shareBtn: {
     borderTopWidth: 1,

@@ -71,12 +71,12 @@ function CalendarStackNavigator() {
       <CalendarStack.Screen
         name="RecordForm"
         component={RecordFormScreen}
-        options={{ headerShown: true, title: '오늘 수영 기록' }}
+        options={{ headerShown: true, title: '오늘 수영 기록', headerBackButtonDisplayMode: 'minimal' }}
       />
       <CalendarStack.Screen
         name="RecordDetail"
         component={RecordDetailScreen}
-        options={{ headerShown: true, title: '기록 상세' }}
+        options={{ headerShown: true, title: '기록 상세', headerBackButtonDisplayMode: 'minimal' }}
       />
       <CalendarStack.Screen
         name="StatDetail"
@@ -102,7 +102,7 @@ function GroupsStackNavigator() {
       <GroupsStack.Screen
         name="ChatRoom"
         component={ChatRoomScreen}
-        options={{ headerShown: true, title: '' }}
+        options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
       />
     </GroupsStack.Navigator>
   );

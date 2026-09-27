@@ -160,12 +160,28 @@ alter table public.chat_groups enable row level security;
 alter table public.chat_group_members enable row level security;
 alter table public.chat_messages enable row level security;
 
+-- 멤버인지 확인하는 함수를 따로 둔다. chat_group_members에 걸린 정책이 다시
+-- chat_group_members를 상관 서브쿼리로 들여다보면, 안쪽 서브쿼리의 group_id 컬럼과
+-- 바깥쪽 행의 group_id 컬럼 이름이 같아서 Postgres가 안쪽 것으로 잘못 해석해버린다.
+-- SECURITY DEFINER 함수로 감싸서 그 모호함 자체를 없앤다.
+create or replace function public.is_group_member(check_group_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.chat_group_members
+    where group_id = check_group_id and user_id = auth.uid()
+  );
+$$;
+
+grant execute on function public.is_group_member(uuid) to authenticated;
+
 create policy "groups: members can read"
   on public.chat_groups for select
-  using (exists (
-    select 1 from public.chat_group_members m
-    where m.group_id = id and m.user_id = auth.uid()
-  ));
+  using (public.is_group_member(id));
 
 create policy "groups: creator can insert"
   on public.chat_groups for insert
@@ -173,10 +189,7 @@ create policy "groups: creator can insert"
 
 create policy "members: can read own group's roster"
   on public.chat_group_members for select
-  using (exists (
-    select 1 from public.chat_group_members m2
-    where m2.group_id = group_id and m2.user_id = auth.uid()
-  ));
+  using (public.is_group_member(group_id));
 
 create policy "members: can add self"
   on public.chat_group_members for insert
@@ -184,20 +197,11 @@ create policy "members: can add self"
 
 create policy "messages: members can read"
   on public.chat_messages for select
-  using (exists (
-    select 1 from public.chat_group_members m
-    where m.group_id = group_id and m.user_id = auth.uid()
-  ));
+  using (public.is_group_member(group_id));
 
 create policy "messages: members can send"
   on public.chat_messages for insert
-  with check (
-    auth.uid() = sender_id
-    and exists (
-      select 1 from public.chat_group_members m
-      where m.group_id = group_id and m.user_id = auth.uid()
-    )
-  );
+  with check (auth.uid() = sender_id and public.is_group_member(group_id));
 
 -- 그룹을 만들면서 만든 사람을 바로 첫 멤버로 넣어준다 + 초대 코드 발급.
 create or replace function public.create_group_with_creator(group_name text, member_ids uuid[])
