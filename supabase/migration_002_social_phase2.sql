@@ -15,6 +15,46 @@ alter table public.chat_groups add column if not exists owner_id uuid references
 update public.chat_groups set owner_id = created_by where owner_id is null;
 alter table public.chat_groups alter column owner_id set not null;
 
+-- create_group_with_creator 재정의: 새로 생긴 owner_id 컬럼도 같이 채워야 한다.
+create or replace function public.create_group_with_creator(group_name text, member_ids uuid[])
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_group_id uuid;
+  new_code text;
+  chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  i int;
+  member uuid;
+begin
+  loop
+    new_code := '';
+    for i in 1..8 loop
+      new_code := new_code || substr(chars, floor(random() * length(chars) + 1)::int, 1);
+    end loop;
+    exit when not exists (select 1 from public.chat_groups where invite_code = new_code);
+  end loop;
+
+  insert into public.chat_groups (name, invite_code, created_by, owner_id)
+  values (group_name, new_code, auth.uid(), auth.uid())
+  returning id into new_group_id;
+
+  insert into public.chat_group_members (group_id, user_id) values (new_group_id, auth.uid());
+
+  foreach member in array member_ids loop
+    if member != auth.uid() then
+      insert into public.chat_group_members (group_id, user_id)
+      values (new_group_id, member)
+      on conflict do nothing;
+    end if;
+  end loop;
+
+  return new_group_id;
+end;
+$$;
+
 -- ---------- 수톡: 강퇴/차단 ----------
 
 create table public.chat_group_bans (
