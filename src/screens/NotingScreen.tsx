@@ -211,12 +211,12 @@ export default function NotingScreen() {
           )}
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>오늘, 물속에서 어땠나요?</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>오늘, 물속에서 어땠나요?</Text>
             <MoodPicker value={mood} onChange={setMood} />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>오늘 연습한 종목</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>오늘 연습한 종목</Text>
             <StrokePicker value={strokes} onChange={setStrokes} />
           </View>
 
@@ -314,7 +314,7 @@ export default function NotingScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>오늘 몸 상태 (선택)</Text>
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>오늘 몸 상태 (선택)</Text>
             <TextInput
               style={styles.input}
               placeholder="뻐근함, 개운함 등"
@@ -381,6 +381,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
   },
+  sectionTitleSpaced: { marginBottom: spacing.xs },
   healthHint: { fontFamily: fonts.regular, color: colors.blueSea, fontSize: 11, flexShrink: 1, textAlign: 'right' },
   row: { flexDirection: 'row', gap: spacing.xs },
   rowSpacingTop: { marginTop: spacing.xs },

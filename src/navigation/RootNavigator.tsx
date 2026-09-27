@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -11,6 +11,13 @@ import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import GroupsScreen from '../screens/social/GroupsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
+import {
+  CalendarIcon,
+  FriendsIcon,
+  GroupsIcon,
+  NotingIcon,
+  ShopIcon,
+} from '../components/icons/TabIcons';
 import { colors, fonts } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList, GroupsStackParamList } from './socialTypes';
@@ -22,18 +29,18 @@ const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const GroupsStack = createNativeStackNavigator<GroupsStackParamList>();
 
-const TAB_ICON: Record<keyof RootTabParamList, string> = {
-  Noting: '\u{1F4DD}',
-  Calendar: '\u{1F4C5}',
-  Friends: '\u{1F465}',
-  Groups: '\u{1F4AC}',
-  Shop: '\u{1F6CD}\u{FE0F}',
+const TAB_ICON: Record<keyof RootTabParamList, React.ComponentType<{ color: string; size?: number }>> = {
+  Noting: NotingIcon,
+  Calendar: CalendarIcon,
+  Friends: FriendsIcon,
+  Groups: GroupsIcon,
+  Shop: ShopIcon,
 };
 
 const TAB_LABEL: Record<keyof RootTabParamList, string> = {
   Noting: '노팅',
   Calendar: '캘린더',
-  Friends: '친구',
+  Friends: '수친',
   Groups: '수모임',
   Shop: '샵',
 };
@@ -94,11 +101,10 @@ function AppTabs() {
         tabBarInactiveTintColor: colors.disabledText,
         tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        tabBarIcon: () => (
-          <Text style={{ fontSize: 20 }}>
-            {TAB_ICON[route.name as keyof RootTabParamList]}
-          </Text>
-        ),
+        tabBarIcon: ({ color }) => {
+          const Icon = TAB_ICON[route.name as keyof RootTabParamList];
+          return <Icon color={color} size={23} />;
+        },
         tabBarLabel: TAB_LABEL[route.name as keyof RootTabParamList],
       })}
     >
