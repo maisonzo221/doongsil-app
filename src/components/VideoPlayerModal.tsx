@@ -54,11 +54,12 @@ export default function VideoPlayerModal({ videoId, onClose }: Props) {
         </View>
         <Text style={styles.hint}>일부 영상은 만든 사람이 앱 내 재생을 막아둬서, 재생이 안 되면 위 버튼을 눌러주세요.</Text>
         <WebView
-          source={{ html: embedHtml(videoId) }}
+          source={{ html: embedHtml(videoId), baseUrl: 'https://www.youtube.com' }}
           style={styles.webview}
           allowsFullscreenVideo
           allowsInlineMediaPlayback
           mediaPlaybackRequiresUserAction={false}
+          originWhitelist={['*']}
         />
       </View>
     </Modal>
