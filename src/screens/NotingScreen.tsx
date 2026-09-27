@@ -197,8 +197,10 @@ export default function NotingScreen() {
           </View>
 
           {todayRecords.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>오늘 남긴 기록 ({todayRecords.length}/{MAX_RECORDS_PER_DAY})</Text>
+            <View style={[styles.section, styles.recordsSection]}>
+              <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>
+                오늘 남긴 기록 ({todayRecords.length}/{MAX_RECORDS_PER_DAY})
+              </Text>
               {todayRecords.map((r) => (
                 <RecordCard
                   key={r.id}
@@ -370,6 +372,7 @@ const styles = StyleSheet.create({
   },
   goalSaveText: { color: colors.white, fontFamily: fonts.bold, fontSize: 12 },
   section: { marginBottom: spacing.lg },
+  recordsSection: { marginBottom: spacing.xl },
   sectionTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
