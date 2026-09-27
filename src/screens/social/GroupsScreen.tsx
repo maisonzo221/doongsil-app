@@ -69,11 +69,11 @@ export default function GroupsScreen({ navigation, route }: Props) {
   }
 
   async function handleCreateGroup() {
-    if (!nameDraft.trim()) return;
+    if (!nameDraft.trim() || !me) return;
     const groupId = await createGroup(nameDraft.trim(), Array.from(selectedFriends));
     setCreateModal(false);
     await reload();
-    navigation.navigate('ChatRoom', { groupId, groupName: nameDraft.trim() });
+    navigation.navigate('ChatRoom', { groupId, groupName: nameDraft.trim(), ownerId: me.id });
   }
 
   async function handleShareInvite(group: ChatGroup) {
@@ -91,9 +91,17 @@ export default function GroupsScreen({ navigation, route }: Props) {
         setJoinCodeDraft('');
         await reload();
         const joined = (await getGroups()).find((g) => g.id === groupId);
-        navigation.navigate('ChatRoom', { groupId, groupName: joined?.name ?? '수톡' });
-      } catch {
-        Alert.alert('참여 실패', '초대 코드를 다시 확인해주세요.');
+        navigation.navigate('ChatRoom', {
+          groupId,
+          groupName: joined?.name ?? '수톡',
+          ownerId: joined?.ownerId ?? '',
+        });
+      } catch (e: any) {
+        if (e?.message?.includes('banned_from_group')) {
+          Alert.alert('참여 불가', '방장에 의해 강퇴된 수톡방이에요.');
+        } else {
+          Alert.alert('참여 실패', '초대 코드를 다시 확인해주세요.');
+        }
       }
     },
     [navigation, reload]
@@ -142,9 +150,22 @@ export default function GroupsScreen({ navigation, route }: Props) {
               <View style={styles.groupCard}>
                 <TouchableOpacity
                   style={styles.groupMain}
-                  onPress={() => navigation.navigate('ChatRoom', { groupId: item.id, groupName: item.name })}
+                  onPress={() =>
+                    navigation.navigate('ChatRoom', {
+                      groupId: item.id,
+                      groupName: item.name,
+                      ownerId: item.ownerId,
+                    })
+                  }
                 >
-                  <Text style={styles.groupName}>{item.name}</Text>
+                  <View style={styles.groupNameRow}>
+                    <Text style={styles.groupName}>{item.name}</Text>
+                    {item.ownerId === me?.id && (
+                      <View style={styles.ownerBadge}>
+                        <Text style={styles.ownerBadgeText}>방장</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.shareBtn} onPress={() => handleShareInvite(item)}>
@@ -255,7 +276,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   groupMain: { padding: spacing.sm },
+  groupNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
   groupName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
+  ownerBadge: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.hairline,
+    paddingVertical: 2,
+  },
+  ownerBadgeText: { fontFamily: fonts.bold, color: colors.primary, fontSize: 10 },
   groupCode: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
   shareBtn: {
     borderTopWidth: 1,

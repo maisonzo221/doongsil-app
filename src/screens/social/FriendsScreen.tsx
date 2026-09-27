@@ -1,10 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -21,8 +21,11 @@ import {
   findRegisteredContacts,
   getFriends,
   MatchedContact,
+  updateFriendCategory,
 } from '../../storage/social';
 import { getCurrentUser, syncContacts, updateNicknames, UserProfile } from '../../storage/auth';
+
+const UNCATEGORIZED = '미분류';
 
 export default function FriendsScreen() {
   const [me, setMe] = useState<UserProfile | null>(null);
@@ -36,6 +39,30 @@ export default function FriendsScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loadingContacts, setLoadingContacts] = useState(false);
   const [inviteCodeDraft, setInviteCodeDraft] = useState('');
+  const [categoryTarget, setCategoryTarget] = useState<Friend | null>(null);
+  const [categoryDraft, setCategoryDraft] = useState('');
+
+  const sections = useMemo(() => {
+    const byCategory = new Map<string, Friend[]>();
+    for (const f of friends) {
+      const key = f.category?.trim() || UNCATEGORIZED;
+      const list = byCategory.get(key) ?? [];
+      list.push(f);
+      byCategory.set(key, list);
+    }
+    const entries = Array.from(byCategory.entries()).sort(([a], [b]) => {
+      if (a === UNCATEGORIZED) return 1;
+      if (b === UNCATEGORIZED) return -1;
+      return a.localeCompare(b);
+    });
+    return entries.map(([title, data]) => ({ title, data }));
+  }, [friends]);
+
+  const existingCategories = useMemo(
+    () =>
+      Array.from(new Set(friends.map((f) => f.category?.trim()).filter((c): c is string => !!c))),
+    [friends]
+  );
 
   const reload = useCallback(async () => {
     const [user, friendList] = await Promise.all([getCurrentUser(), getFriends()]);
@@ -102,10 +129,22 @@ export default function FriendsScreen() {
     await reload();
   }
 
+  function openCategoryModal(friend: Friend) {
+    setCategoryTarget(friend);
+    setCategoryDraft(friend.category ?? '');
+  }
+
+  async function handleSaveCategory() {
+    if (!categoryTarget) return;
+    await updateFriendCategory(categoryTarget.id, categoryDraft.trim() || null);
+    setCategoryTarget(null);
+    await reload();
+  }
+
   return (
     <ScreenBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>친구</Text>
+        <Text style={styles.title}>수친</Text>
 
         {me && (
           <TouchableOpacity
@@ -137,8 +176,8 @@ export default function FriendsScreen() {
             </Text>
           </View>
         ) : (
-          <FlatList
-            data={friends}
+          <SectionList
+            sections={sections}
             keyExtractor={(f) => f.id}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
@@ -146,8 +185,11 @@ export default function FriendsScreen() {
                 <Text style={styles.addRowText}>+ 수친 추가하기</Text>
               </TouchableOpacity>
             }
+            renderSectionHeader={({ section }) => (
+              <Text style={styles.categoryHeader}>{section.title}</Text>
+            )}
             renderItem={({ item }) => (
-              <View style={styles.friendCard}>
+              <TouchableOpacity style={styles.friendCard} onPress={() => openCategoryModal(item)}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{item.nicknameKo.slice(0, 1)}</Text>
                 </View>
@@ -155,7 +197,8 @@ export default function FriendsScreen() {
                   <Text style={styles.friendName}>{item.nicknameKo}</Text>
                   <Text style={styles.friendNote}>{item.nicknameEn}</Text>
                 </View>
-              </View>
+                <Text style={styles.categoryEditHint}>분류</Text>
+              </TouchableOpacity>
             )}
             ListEmptyComponent={
               <Text style={styles.empty}>아직 수친이 없어요. 연락처나 가입 코드로 추가해보세요.</Text>
@@ -190,6 +233,50 @@ export default function FriendsScreen() {
                 <Text style={styles.modalCancelText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalConfirm} onPress={handleSaveNicknames}>
+                <Text style={styles.modalConfirmText}>저장</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 친구 분류 모달 */}
+      <Modal visible={!!categoryTarget} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{categoryTarget?.nicknameKo} 분류</Text>
+            {existingCategories.length > 0 && (
+              <View style={styles.categoryChipRow}>
+                {existingCategories.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.categoryChip, categoryDraft === c && styles.categoryChipActive]}
+                    onPress={() => setCategoryDraft(c)}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        categoryDraft === c && styles.categoryChipTextActive,
+                      ]}
+                    >
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TextInput
+              style={styles.input}
+              value={categoryDraft}
+              onChangeText={setCategoryDraft}
+              placeholder="예: A수영장 수업, 자유 수영 모임"
+              placeholderTextColor={colors.textMuted}
+            />
+            <View style={styles.modalRow}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setCategoryTarget(null)}>
+                <Text style={styles.modalCancelText}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleSaveCategory}>
                 <Text style={styles.modalConfirmText}>저장</Text>
               </TouchableOpacity>
             </View>
@@ -285,6 +372,13 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   addRowText: { fontFamily: fonts.semibold, color: colors.primary },
+  categoryHeader: {
+    fontFamily: fonts.bold,
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: spacing.sm,
+    marginBottom: spacing.hairline,
+  },
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -293,6 +387,7 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
     marginBottom: spacing.hairline + 4,
   },
+  categoryEditHint: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   avatar: {
     width: 40,
     height: 40,
@@ -325,6 +420,21 @@ const styles = StyleSheet.create({
   modalLabel: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 12, marginBottom: 4 },
   sectionLabel: { fontFamily: fonts.bold, color: colors.text, fontSize: 13, marginBottom: spacing.xs },
   sectionLabelSpaced: { marginTop: spacing.md },
+  categoryChipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.hairline,
+    marginBottom: spacing.xs,
+  },
+  categoryChip: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.hairline,
+  },
+  categoryChipActive: { backgroundColor: colors.primary },
+  categoryChipText: { fontFamily: fonts.semibold, color: colors.text, fontSize: 12 },
+  categoryChipTextActive: { color: colors.white },
   input: {
     backgroundColor: colors.cardSoft,
     borderRadius: radius.md,

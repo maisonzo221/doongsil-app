@@ -4,5 +4,5 @@ export type FriendsStackParamList = {
 
 export type GroupsStackParamList = {
   GroupsHome: { code?: string } | undefined;
-  ChatRoom: { groupId: string; groupName: string };
+  ChatRoom: { groupId: string; groupName: string; ownerId: string };
 };

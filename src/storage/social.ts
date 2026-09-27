@@ -3,12 +3,14 @@
 import * as Contacts from 'expo-contacts';
 import { supabase } from '../lib/supabase';
 import { toE164 } from '../utils/phone';
+import { containsProfanity } from '../utils/profanity';
 import { getCurrentUser } from './auth';
 
 export interface Friend {
   id: string;
   nicknameKo: string;
   nicknameEn: string;
+  category?: string;
 }
 
 export interface MatchedContact extends Friend {
@@ -21,6 +23,7 @@ export interface ChatGroup {
   name: string;
   inviteCode: string;
   createdAt: string;
+  ownerId: string;
 }
 
 export type ChatMessageType = 'text' | 'photo' | 'record_share';
@@ -47,14 +50,29 @@ export async function getFriends(): Promise<Friend[]> {
 
   const { data, error } = await supabase
     .from('friendships')
-    .select('friend_id, profiles:profiles!friendships_friend_id_fkey(id, nickname_ko, nickname_en)')
+    .select('category, profiles:profiles!friendships_friend_id_fkey(id, nickname_ko, nickname_en)')
     .eq('user_id', me.id);
 
   if (error || !data) return [];
-  return data
-    .map((row: any) => row.profiles)
-    .filter(Boolean)
-    .map((p: any) => ({ id: p.id, nicknameKo: p.nickname_ko, nicknameEn: p.nickname_en }));
+  return (data as any[])
+    .filter((row) => row.profiles)
+    .map((row) => ({
+      id: row.profiles.id,
+      nicknameKo: row.profiles.nickname_ko,
+      nicknameEn: row.profiles.nickname_en,
+      category: row.category ?? undefined,
+    }));
+}
+
+/** 친구 하나를 내 기준으로 원하는 카테고리(예: "A수영장 수업")로 분류한다. */
+export async function updateFriendCategory(friendId: string, category: string | null): Promise<void> {
+  const me = await getCurrentUser();
+  if (!me) return;
+  await supabase
+    .from('friendships')
+    .update({ category })
+    .eq('user_id', me.id)
+    .eq('friend_id', friendId);
 }
 
 /** 기기 연락처 권한이 이미 허용된 상태에서, 연락처의 전화번호로 가입자를 찾는다. */
@@ -110,7 +128,7 @@ export async function addFriendByInviteCode(
 export async function getGroups(): Promise<ChatGroup[]> {
   const { data, error } = await supabase
     .from('chat_groups')
-    .select('id, name, invite_code, created_at')
+    .select('id, name, invite_code, created_at, owner_id')
     .order('created_at', { ascending: false });
   if (error || !data) return [];
   return data.map((g) => ({
@@ -118,7 +136,32 @@ export async function getGroups(): Promise<ChatGroup[]> {
     name: g.name,
     inviteCode: g.invite_code,
     createdAt: g.created_at,
+    ownerId: g.owner_id,
   }));
+}
+
+/** 방장이 멤버를 강퇴한다. 강퇴된 사람은 같은 초대 코드로 다시 못 들어온다. */
+export async function kickMember(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('kick_member', {
+    target_group_id: groupId,
+    target_user_id: userId,
+  });
+  if (error) throw error;
+}
+
+/** 방장 권한을 다른 멤버에게 넘긴다. */
+export async function transferOwnership(groupId: string, newOwnerId: string): Promise<void> {
+  const { error } = await supabase.rpc('transfer_ownership', {
+    target_group_id: groupId,
+    new_owner_id: newOwnerId,
+  });
+  if (error) throw error;
+}
+
+/** 수톡방에서 나간다. 방장은 먼저 방장 위임부터 해야 한다. */
+export async function leaveGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_group', { target_group_id: groupId });
+  if (error) throw error;
 }
 
 export async function createGroup(name: string, memberIds: string[]): Promise<string> {
@@ -172,12 +215,23 @@ export async function getMessages(groupId: string): Promise<ChatMessage[]> {
   }));
 }
 
+export class ProfanityBlockedError extends Error {}
+
 export async function sendTextMessage(groupId: string, text: string): Promise<void> {
+  if (containsProfanity(text)) {
+    throw new ProfanityBlockedError('비속어가 포함되어 있어요.');
+  }
   const me = await getCurrentUser();
   if (!me) return;
-  await supabase
+  const { error } = await supabase
     .from('chat_messages')
     .insert({ group_id: groupId, sender_id: me.id, type: 'text', text });
+  if (error) {
+    if (error.message?.includes('profanity_blocked')) {
+      throw new ProfanityBlockedError('비속어가 포함되어 있어요.');
+    }
+    throw error;
+  }
 }
 
 export async function shareRecordToGroup(groupId: string, summary: string): Promise<void> {
