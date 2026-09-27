@@ -9,13 +9,22 @@ import {
   type Quantity,
 } from '@kingstinct/react-native-healthkit';
 import { Stroke } from '../types';
+import { computePaceSecPer100m, estimateSwolf } from '../utils/pace';
 
 export interface HealthImportResult {
   distanceMeters: number;
   durationMinutes: number;
   calories: number;
   avgHeartRate: number;
+  avgPaceSecPer100m?: number;
+  swolf?: number;
+  strokeCount?: number;
   strokes: Stroke[];
+}
+
+export interface TodayActivitySummary {
+  activeCalories: number;
+  swimMeters: number;
 }
 
 const READ_TYPES: ObjectTypeIdentifier[] = [
@@ -101,11 +110,72 @@ export async function getTodaySwimWorkout(dateString: string): Promise<HealthImp
     avgHeartRate = 0;
   }
 
+  let strokeCount = 0;
+  try {
+    const stats = await queryStatisticsForQuantity(
+      'HKQuantityTypeIdentifierSwimmingStrokeCount',
+      ['cumulativeSum'],
+      { filter: { workout }, unit: 'count' }
+    );
+    strokeCount = stats.sumQuantity ? Math.round(stats.sumQuantity.quantity) : 0;
+  } catch {
+    strokeCount = 0;
+  }
+
+  const distanceMeters = Math.round(metersFromDistance(workout.totalDistance) ?? 0);
+  const durationMinutes = minutesFromDuration(workout.duration) ?? 0;
+
   return {
-    distanceMeters: Math.round(metersFromDistance(workout.totalDistance) ?? 0),
-    durationMinutes: minutesFromDuration(workout.duration) ?? 0,
+    distanceMeters,
+    durationMinutes,
     calories: Math.round(workout.totalEnergyBurned?.quantity ?? 0),
     avgHeartRate,
+    avgPaceSecPer100m: computePaceSecPer100m(distanceMeters, durationMinutes),
+    swolf: estimateSwolf(distanceMeters, durationMinutes, strokeCount),
+    strokeCount: strokeCount || undefined,
     strokes: ['freestyle'],
   };
+}
+
+/** 오늘 하루 총 활동 칼로리와 수영 거리 — 캘린더 상단 링용. */
+export async function getTodayActivitySummary(
+  dateString: string
+): Promise<TodayActivitySummary | null> {
+  if (Platform.OS !== 'ios') return null;
+
+  const available = await isHealthAvailable();
+  if (!available) return null;
+
+  const granted = await requestHealthAuthorization();
+  if (!granted) return null;
+
+  const [y, m, d] = dateString.split('-').map(Number);
+  const startDate = new Date(y, m - 1, d, 0, 0, 0);
+  const endDate = new Date(y, m - 1, d, 23, 59, 59);
+
+  let activeCalories = 0;
+  try {
+    const stats = await queryStatisticsForQuantity(
+      'HKQuantityTypeIdentifierActiveEnergyBurned',
+      ['cumulativeSum'],
+      { filter: { date: { startDate, endDate } }, unit: 'kcal' }
+    );
+    activeCalories = stats.sumQuantity ? Math.round(stats.sumQuantity.quantity) : 0;
+  } catch {
+    activeCalories = 0;
+  }
+
+  let swimMeters = 0;
+  try {
+    const stats = await queryStatisticsForQuantity(
+      'HKQuantityTypeIdentifierDistanceSwimming',
+      ['cumulativeSum'],
+      { filter: { date: { startDate, endDate } }, unit: 'm' }
+    );
+    swimMeters = stats.sumQuantity ? Math.round(stats.sumQuantity.quantity) : 0;
+  } catch {
+    swimMeters = 0;
+  }
+
+  return { activeCalories, swimMeters };
 }

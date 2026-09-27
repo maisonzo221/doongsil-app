@@ -19,6 +19,12 @@ export const colors = {
   border: '#D6EAE6',
   white: '#FFFFFF',
   shadow: '#8FCBE0',
+
+  // 애플 건강 캘린더 참고 — 활동량(주황/붉은 계열), 수영량(파란 계열) 링.
+  ringActivity: '#FF6B3D',
+  ringActivityTrack: '#FFE2D4',
+  ringSwim: '#2F9BFF',
+  ringSwimTrack: '#D6ECFF',
 };
 
 export const moodColors: Record<string, string> = {

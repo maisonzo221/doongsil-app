@@ -3,10 +3,13 @@ import { View } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import NotingScreen from '../screens/NotingScreen';
 import CalendarScreen from '../screens/CalendarScreen';
+import RecordFormScreen from '../screens/RecordFormScreen';
 import RecordDetailScreen from '../screens/RecordDetailScreen';
+import StatDetailScreen from '../screens/StatDetailScreen';
 import ShopScreen from '../screens/ShopScreen';
+import TeachingScreen from '../screens/TeachingScreen';
+import TipRoomScreen from '../screens/TipRoomScreen';
 import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import GroupsScreen from '../screens/social/GroupsScreen';
@@ -15,8 +18,9 @@ import {
   CalendarIcon,
   FriendsIcon,
   GroupsIcon,
-  NotingIcon,
   ShopIcon,
+  TeachingIcon,
+  TipRoomIcon,
 } from '../components/icons/TabIcons';
 import { colors, fonts } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
@@ -30,18 +34,20 @@ const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const GroupsStack = createNativeStackNavigator<GroupsStackParamList>();
 
 const TAB_ICON: Record<keyof RootTabParamList, React.ComponentType<{ color: string; size?: number }>> = {
-  Noting: NotingIcon,
   Calendar: CalendarIcon,
   Friends: FriendsIcon,
   Groups: GroupsIcon,
+  Teaching: TeachingIcon,
+  TipRoom: TipRoomIcon,
   Shop: ShopIcon,
 };
 
 const TAB_LABEL: Record<keyof RootTabParamList, string> = {
-  Noting: '노팅',
   Calendar: '캘린더',
   Friends: '수친',
-  Groups: '수모임',
+  Groups: '수톡',
+  Teaching: '티칭',
+  TipRoom: '팁방',
   Shop: '샵',
 };
 
@@ -63,9 +69,19 @@ function CalendarStackNavigator() {
     <CalendarStack.Navigator screenOptions={{ headerShown: false }}>
       <CalendarStack.Screen name="CalendarHome" component={CalendarScreen} />
       <CalendarStack.Screen
+        name="RecordForm"
+        component={RecordFormScreen}
+        options={{ headerShown: true, title: '오늘 수영 기록' }}
+      />
+      <CalendarStack.Screen
         name="RecordDetail"
         component={RecordDetailScreen}
         options={{ headerShown: true, title: '기록 상세' }}
+      />
+      <CalendarStack.Screen
+        name="StatDetail"
+        component={StatDetailScreen}
+        options={{ headerShown: false }}
       />
     </CalendarStack.Navigator>
   );
@@ -103,12 +119,11 @@ function AppTabs() {
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
         tabBarIcon: ({ color }) => {
           const Icon = TAB_ICON[route.name as keyof RootTabParamList];
-          return <Icon color={color} size={23} />;
+          return <Icon color={color} size={22} />;
         },
         tabBarLabel: TAB_LABEL[route.name as keyof RootTabParamList],
       })}
     >
-      <Tab.Screen name="Noting" component={NotingScreen} />
       <Tab.Screen name="Calendar" component={CalendarStackNavigator} />
       {FEATURE_FLAGS.friendsAndChat && (
         <>
@@ -116,6 +131,8 @@ function AppTabs() {
           <Tab.Screen name="Groups" component={GroupsStackNavigator} />
         </>
       )}
+      <Tab.Screen name="Teaching" component={TeachingScreen} />
+      <Tab.Screen name="TipRoom" component={TipRoomScreen} />
       <Tab.Screen name="Shop" component={ShopScreen} />
     </Tab.Navigator>
   );

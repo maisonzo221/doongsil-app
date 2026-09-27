@@ -16,7 +16,7 @@ export default function ShopScreen() {
         <Text style={styles.title}>샵</Text>
         <View style={styles.banner}>
           <Text style={styles.bannerEmoji}>{'\u{1F6DF}'}</Text>
-          <Text style={styles.bannerTitle}>샵은 준비 중이에요</Text>
+          <Text style={styles.bannerTitle}>샵 준비중이에요.</Text>
           <Text style={styles.bannerSubtitle}>
             둥실과 함께할 굿즈를 준비하고 있어요.{'\n'}조금만 기다려주세요!
           </Text>

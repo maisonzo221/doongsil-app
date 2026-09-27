@@ -1,4 +1,4 @@
-// 수친(친구) / 수모임(채팅방) — Supabase 백엔드 연동.
+// 수친(친구) / 수톡(채팅방) — Supabase 백엔드 연동.
 // 로컬에는 아무것도 저장하지 않는다 (여러 기기/사용자 간에 실제로 연결되어야 하는 데이터라서).
 import * as Contacts from 'expo-contacts';
 import { supabase } from '../lib/supabase';
@@ -105,7 +105,7 @@ export async function addFriendByInviteCode(
   return { ok: true, nickname: displayName(target) };
 }
 
-// ---- 수모임 ----
+// ---- 수톡 ----
 
 export async function getGroups(): Promise<ChatGroup[]> {
   const { data, error } = await supabase

@@ -111,7 +111,7 @@ export async function signInWithApple(): Promise<UserProfile> {
     : '';
 
   if (!isSupabaseConfigured || !credential.identityToken) {
-    // 백엔드가 설정 안 된 상태 (.env 없음) — 로그인은 로컬로만 처리, 수친/수모임은 비활성.
+    // 백엔드가 설정 안 된 상태 (.env 없음) — 로그인은 로컬로만 처리, 수친/수톡은 비활성.
     const profile: UserProfile = {
       id: credential.user,
       nicknameKo: name || '수영하는 사람',

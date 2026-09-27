@@ -68,6 +68,34 @@ export function GroupsIcon({ color, size }: IconProps) {
   );
 }
 
+export function TeachingIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Circle cx="12" cy="12" r="8.2" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path
+        d="M10 8.7l5.2 3.3-5.2 3.3V8.7z"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinejoin="round"
+      />
+    </Base>
+  );
+}
+
+export function TipRoomIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Path
+        d="M12 21c4.5-4.8 7-8.3 7-11.3A7 7 0 105 9.7C5 12.7 7.5 16.2 12 21z"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinejoin="round"
+      />
+      <Circle cx="12" cy="9.6" r="2.3" stroke={color} strokeWidth={STROKE_WIDTH} />
+    </Base>
+  );
+}
+
 export function ShopIcon({ color, size }: IconProps) {
   return (
     <Base size={size}>

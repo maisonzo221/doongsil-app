@@ -26,8 +26,13 @@ export interface SwimRecord {
   durationMinutes?: number;
   calories?: number;
   avgHeartRate?: number;
+  /** 초당 100m 환산 평균 페이스 (초). distanceMeters/durationMinutes로부터 계산. */
+  avgPaceSecPer100m?: number;
+  /** 평균 SWOLF (한 구간 소요 시간(초) + 스트로크 수). 랩 단위 데이터가 없을 때는 전체 평균으로 근사. */
+  swolf?: number;
+  /** 애플 피트니스에서 불러온 전체 스트로크 횟수. 수동 입력 기록에는 없을 수 있다. */
+  strokeCount?: number;
   memo?: string;
-  condition?: string;
   /** 애플 피트니스에서 자동으로 불러온 기록인지, 직접 입력했는지 */
   source: 'manual' | 'health';
   createdAt: number;

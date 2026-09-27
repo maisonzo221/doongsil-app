@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../components/ScreenBackground';
 import MoodPicker from '../components/MoodPicker';
 import StrokePicker from '../components/StrokePicker';
@@ -21,11 +22,15 @@ import { addRecord, deleteRecord, getAllRecords } from '../storage/records';
 import { getGoal, setGoal } from '../storage/goals';
 import { getTodaySwimWorkout } from '../services/appleHealth';
 import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
-import { currentYearMonth, formatDateLabel, formatMonthLabel, todayString } from '../utils/date';
+import { computePaceSecPer100m, formatPace } from '../utils/pace';
+import { currentYearMonth, formatMonthLabel, todayString } from '../utils/date';
+import { CalendarStackParamList } from '../navigation/types';
+
+type Props = NativeStackScreenProps<CalendarStackParamList, 'RecordForm'>;
 
 const MAX_RECORDS_PER_DAY = 3;
 
-export default function NotingScreen() {
+export default function RecordFormScreen({ navigation }: Props) {
   const [mood, setMood] = useState<Mood>('good');
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [distance, setDistance] = useState('');
@@ -33,8 +38,9 @@ export default function NotingScreen() {
   const [calories, setCalories] = useState('');
   const [avgHeartRate, setAvgHeartRate] = useState('');
   const [memo, setMemo] = useState('');
-  const [condition, setCondition] = useState('');
   const [source, setSource] = useState<'manual' | 'health'>('manual');
+  const [swolf, setSwolf] = useState<number | undefined>(undefined);
+  const [strokeCount, setStrokeCount] = useState<number | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   const [goalText, setGoalText] = useState('');
@@ -71,6 +77,8 @@ export default function NotingScreen() {
           setCalories(String(imported.calories));
           setAvgHeartRate(String(imported.avgHeartRate));
           setStrokes(imported.strokes);
+          setSwolf(imported.swolf);
+          setStrokeCount(imported.strokeCount);
           setSource('health');
         }
       });
@@ -88,11 +96,16 @@ export default function NotingScreen() {
     setCalories('');
     setAvgHeartRate('');
     setMemo('');
-    setCondition('');
+    setSwolf(undefined);
+    setStrokeCount(undefined);
     setSource('manual');
   }
 
   const reachedDailyLimit = todayRecords.length >= MAX_RECORDS_PER_DAY;
+  const computedPace = computePaceSecPer100m(
+    distance ? Number(distance) : undefined,
+    duration ? Number(duration) : undefined
+  );
 
   async function handleSave() {
     if (reachedDailyLimit) {
@@ -110,8 +123,10 @@ export default function NotingScreen() {
         durationMinutes: duration ? Number(duration) : undefined,
         calories: calories ? Number(calories) : undefined,
         avgHeartRate: avgHeartRate ? Number(avgHeartRate) : undefined,
+        avgPaceSecPer100m: computedPace,
+        swolf,
+        strokeCount,
         memo: memo.trim() || undefined,
-        condition: condition.trim() || undefined,
         source,
       });
       resetForm();
@@ -132,7 +147,8 @@ export default function NotingScreen() {
     setCalories(record.calories ? String(record.calories) : '');
     setAvgHeartRate(record.avgHeartRate ? String(record.avgHeartRate) : '');
     setMemo(record.memo ?? '');
-    setCondition(record.condition ?? '');
+    setSwolf(record.swolf);
+    setStrokeCount(record.strokeCount);
     setSource(record.source);
   }
 
@@ -163,9 +179,6 @@ export default function NotingScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.title}>노팅</Text>
-          <Text style={styles.subtitle}>{formatDateLabel(todayString())}</Text>
-
           <View style={styles.goalCard}>
             <Text style={styles.goalLabel}>{formatMonthLabel(currentYearMonth())} 목표</Text>
             {editingGoal ? (
@@ -285,6 +298,14 @@ export default function NotingScreen() {
                 />
               </View>
             </View>
+            {(computedPace || swolf != null) && (
+              <View style={styles.derivedRow}>
+                {computedPace != null && (
+                  <Text style={styles.derivedText}>평균 페이스 {formatPace(computedPace)}</Text>
+                )}
+                {swolf != null && <Text style={styles.derivedText}>SWOLF {swolf}</Text>}
+              </View>
+            )}
           </View>
 
           <View style={styles.section}>
@@ -315,17 +336,6 @@ export default function NotingScreen() {
             />
           </View>
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>오늘 몸 상태 (선택)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="뻐근함, 개운함 등"
-              placeholderTextColor={colors.textMuted}
-              value={condition}
-              onChangeText={setCondition}
-            />
-          </View>
-
           <TouchableOpacity
             style={[styles.saveBtn, (saving || reachedDailyLimit) && styles.saveBtnDisabled]}
             onPress={handleSave}
@@ -344,8 +354,6 @@ export default function NotingScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
-  title: { fontSize: 28, fontFamily: fonts.bold, color: colors.text },
-  subtitle: { color: colors.textMuted, fontFamily: fonts.regular, marginTop: 2, marginBottom: spacing.lg },
   goalCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -397,6 +405,8 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontFamily: fonts.regular,
   },
+  derivedRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  derivedText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   memoTools: { flexDirection: 'row', gap: spacing.hairline },
   memoToolBtn: {
     width: 28,

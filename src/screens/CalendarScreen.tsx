@@ -8,11 +8,17 @@ import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
 import RecordCard from '../components/RecordCard';
 import DailyOceanCard from '../components/DailyOceanCard';
+import ActivityRings from '../components/ActivityRings';
+import RoutineRecommendations from '../components/RoutineRecommendations';
+import { NotingIcon } from '../components/icons/TabIcons';
 import { SwimRecord } from '../types';
 import { colors, fonts, moodColors, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
+import { getTodayActivitySummary, TodayActivitySummary } from '../services/appleHealth';
 import { computeStreak } from '../utils/streak';
 import { monthlySummary, totalDistanceLabel } from '../utils/summary';
+import { avgPaceSecPer100m, avgStrokeCount, avgSwolf, totalDistanceMeters } from '../utils/stats';
+import { formatPace } from '../utils/pace';
 import { currentYearMonth, formatMonthLabel, formatDateLabel, todayString } from '../utils/date';
 import { CalendarStackParamList } from '../navigation/types';
 
@@ -36,10 +42,17 @@ export default function CalendarScreen({ navigation }: Props) {
   const [records, setRecords] = useState<SwimRecord[]>([]);
   const [visibleMonth, setVisibleMonth] = useState(currentYearMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [todayActivity, setTodayActivity] = useState<TodayActivitySummary>({
+    activeCalories: 0,
+    swimMeters: 0,
+  });
 
   useFocusEffect(
     useCallback(() => {
       getAllRecords().then(setRecords);
+      getTodayActivitySummary(todayString()).then((summary) => {
+        if (summary) setTodayActivity(summary);
+      });
     }, [])
   );
 
@@ -66,6 +79,11 @@ export default function CalendarScreen({ navigation }: Props) {
   const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
   const header = todayHeaderParts();
 
+  const totalDistance = useMemo(() => totalDistanceMeters(records), [records]);
+  const swolf = useMemo(() => avgSwolf(records), [records]);
+  const strokeCount = useMemo(() => avgStrokeCount(records), [records]);
+  const pace = useMemo(() => avgPaceSecPer100m(records), [records]);
+
   return (
     <ScreenBackground>
       <ScrollView style={styles.container} contentContainerStyle={styles.containerContent}>
@@ -80,6 +98,18 @@ export default function CalendarScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+
+        <View style={styles.ringsCard}>
+          <ActivityRings activeCalories={todayActivity.activeCalories} swimMeters={todayActivity.swimMeters} />
+        </View>
+
+        <TouchableOpacity
+          style={styles.addRecordBtn}
+          onPress={() => navigation.navigate('RecordForm')}
+        >
+          <NotingIcon color={colors.white} size={18} />
+          <Text style={styles.addRecordBtnText}>오늘 수영 +</Text>
+        </TouchableOpacity>
 
         <DailyOceanCard />
 
@@ -157,6 +187,29 @@ export default function CalendarScreen({ navigation }: Props) {
           <Text style={styles.distanceText}>{distanceLabel}</Text>
         </View>
 
+        <View style={styles.statsGrid}>
+          <StatTile
+            label="누적거리"
+            value={totalDistance >= 1000 ? `${(totalDistance / 1000).toFixed(1)}km` : `${totalDistance}m`}
+            onPress={() => navigation.navigate('StatDetail', { metric: 'distance', allRecords: records })}
+          />
+          <StatTile
+            label="SWOLF 추이"
+            value={swolf != null ? `${Math.round(swolf)}` : '-'}
+            onPress={() => navigation.navigate('StatDetail', { metric: 'swolf', allRecords: records })}
+          />
+          <StatTile
+            label="스트로크 효율"
+            value={strokeCount != null ? `평균 ${Math.round(strokeCount)}회` : '-'}
+            onPress={() => navigation.navigate('StatDetail', { metric: 'strokes', allRecords: records })}
+          />
+          <StatTile
+            label="내 평균 기록"
+            value={pace != null ? formatPace(Math.round(pace)) : '-'}
+            onPress={() => navigation.navigate('StatDetail', { metric: 'averages', allRecords: records })}
+          />
+        </View>
+
         {recentRecords.length > 0 && (
           <View style={styles.recentSection}>
             <Text style={styles.recentTitle}>최근 기록</Text>
@@ -165,6 +218,8 @@ export default function CalendarScreen({ navigation }: Props) {
             ))}
           </View>
         )}
+
+        <RoutineRecommendations />
       </ScrollView>
 
       <Modal
@@ -200,6 +255,15 @@ export default function CalendarScreen({ navigation }: Props) {
   );
 }
 
+function StatTile({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.statTile} onPress={onPress}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   containerContent: { padding: spacing.lg, paddingBottom: spacing.xl },
@@ -217,6 +281,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     gap: spacing.xs,
   },
+  ringsCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  addRecordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.hairline,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.xs + 2,
+    marginBottom: spacing.sm,
+  },
+  addRecordBtnText: { fontFamily: fonts.bold, color: colors.white, fontSize: 15 },
   dropsRow: { flexDirection: 'row', alignItems: 'center' },
   streakText: { color: colors.text, fontFamily: fonts.semibold },
   summaryCard: {
@@ -248,6 +329,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   distanceText: { color: colors.blueSea, fontFamily: fonts.bold, fontSize: 15 },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  statTile: {
+    width: '47%',
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+  },
+  statLabel: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 12 },
+  statValue: { fontFamily: fonts.bold, color: colors.text, fontSize: 18, marginTop: 4 },
   recentSection: { marginTop: spacing.lg },
   recentTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
   modalBackdrop: {

@@ -79,7 +79,7 @@ export default function GroupsScreen({ navigation, route }: Props) {
   async function handleShareInvite(group: ChatGroup) {
     const link = inviteLinkFor(group.inviteCode);
     await Share.share({
-      message: `둥실 수모임 "${group.name}"에 초대할게요!\n${link}\n(또는 앱에서 코드 ${group.inviteCode} 입력)`,
+      message: `둥실 수톡 "${group.name}"에 초대할게요!\n${link}\n(또는 앱에서 코드 ${group.inviteCode} 입력)`,
     });
   }
 
@@ -91,7 +91,7 @@ export default function GroupsScreen({ navigation, route }: Props) {
         setJoinCodeDraft('');
         await reload();
         const joined = (await getGroups()).find((g) => g.id === groupId);
-        navigation.navigate('ChatRoom', { groupId, groupName: joined?.name ?? '수모임' });
+        navigation.navigate('ChatRoom', { groupId, groupName: joined?.name ?? '수톡' });
       } catch {
         Alert.alert('참여 실패', '초대 코드를 다시 확인해주세요.');
       }
@@ -115,12 +115,12 @@ export default function GroupsScreen({ navigation, route }: Props) {
   return (
     <ScreenBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>수모임</Text>
+        <Text style={styles.title}>수톡</Text>
 
         {disabled ? (
           <View style={styles.disabledNotice}>
             <Text style={styles.disabledText}>
-              수모임 기능은 Apple 로그인 계정에서만 사용할 수 있어요.
+              수톡 기능은 Apple 로그인 계정에서만 사용할 수 있어요.
             </Text>
           </View>
         ) : (
@@ -131,7 +131,7 @@ export default function GroupsScreen({ navigation, route }: Props) {
             ListHeaderComponent={
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.addRow} onPress={openCreateModal}>
-                  <Text style={styles.addRowText}>+ 수모임 만들기</Text>
+                  <Text style={styles.addRowText}>+ 수톡 만들기</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.addRow} onPress={() => setJoinModal(true)}>
                   <Text style={styles.addRowText}>코드로 참여</Text>
@@ -153,22 +153,22 @@ export default function GroupsScreen({ navigation, route }: Props) {
               </View>
             )}
             ListEmptyComponent={
-              <Text style={styles.empty}>아직 수모임이 없어요.</Text>
+              <Text style={styles.empty}>아직 수톡이 없어요.</Text>
             }
           />
         )}
       </View>
 
-      {/* 수모임 만들기 */}
+      {/* 수톡 만들기 */}
       <Modal visible={createModal} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>수모임 만들기</Text>
+            <Text style={styles.modalTitle}>수톡 만들기</Text>
             <TextInput
               style={styles.input}
               value={nameDraft}
               onChangeText={setNameDraft}
-              placeholder="수모임 이름 (예: 수요일 자유수영팟)"
+              placeholder="수톡 이름 (예: 수요일 자유수영팟)"
               placeholderTextColor={colors.textMuted}
             />
             <Text style={styles.sectionLabel}>수친 초대 (선택)</Text>

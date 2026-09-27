@@ -8,7 +8,7 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!url || !anonKey) {
   console.warn(
     '[supabase] EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY 가 설정되지 않았어요. ' +
-      '.env.example을 참고해서 .env 파일을 만들어주세요. 수친/수모임 기능이 동작하지 않습니다.'
+      '.env.example을 참고해서 .env 파일을 만들어주세요. 수친/수톡 기능이 동작하지 않습니다.'
   );
 }
 

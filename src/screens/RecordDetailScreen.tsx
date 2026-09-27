@@ -17,6 +17,7 @@ import { Mood, Stroke, SwimRecord } from '../types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { deleteRecord, getAllRecords, updateRecord } from '../storage/records';
 import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
+import { computePaceSecPer100m, formatPace } from '../utils/pace';
 import { formatDateLabel } from '../utils/date';
 import { CalendarStackParamList } from '../navigation/types';
 
@@ -32,8 +33,9 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
   const [calories, setCalories] = useState('');
   const [avgHeartRate, setAvgHeartRate] = useState('');
   const [memo, setMemo] = useState('');
-  const [condition, setCondition] = useState('');
   const [source, setSource] = useState<'manual' | 'health'>('manual');
+  const [swolf, setSwolf] = useState<number | undefined>(undefined);
+  const [strokeCount, setStrokeCount] = useState<number | undefined>(undefined);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,8 +50,9 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
           setCalories(found.calories ? String(found.calories) : '');
           setAvgHeartRate(found.avgHeartRate ? String(found.avgHeartRate) : '');
           setMemo(found.memo ?? '');
-          setCondition(found.condition ?? '');
           setSource(found.source);
+          setSwolf(found.swolf);
+          setStrokeCount(found.strokeCount);
         }
       });
     }, [id])
@@ -57,17 +60,21 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
 
   async function handleSave() {
     if (!record) return;
+    const distanceMeters = distance ? Number(distance) : undefined;
+    const durationMinutes = duration ? Number(duration) : undefined;
     await updateRecord(record.id, {
       sport: record.sport,
       date: record.date,
       mood,
       strokes,
-      distanceMeters: distance ? Number(distance) : undefined,
-      durationMinutes: duration ? Number(duration) : undefined,
+      distanceMeters,
+      durationMinutes,
       calories: calories ? Number(calories) : undefined,
       avgHeartRate: avgHeartRate ? Number(avgHeartRate) : undefined,
+      avgPaceSecPer100m: computePaceSecPer100m(distanceMeters, durationMinutes),
+      swolf,
+      strokeCount,
       memo: memo.trim() || undefined,
-      condition: condition.trim() || undefined,
       source,
     });
     navigation.goBack();
@@ -155,6 +162,20 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
               }}
             />
           </View>
+          {(computePaceSecPer100m(distance ? Number(distance) : undefined, duration ? Number(duration) : undefined) ||
+            swolf != null) && (
+            <View style={styles.derivedRow}>
+              {distance && duration && (
+                <Text style={styles.derivedText}>
+                  평균 페이스{' '}
+                  {formatPace(
+                    computePaceSecPer100m(Number(distance), Number(duration))
+                  )}
+                </Text>
+              )}
+              {swolf != null && <Text style={styles.derivedText}>SWOLF {swolf}</Text>}
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -184,16 +205,6 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
           />
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>몸 상태</Text>
-          <TextInput
-            style={styles.input}
-            value={condition}
-            onChangeText={setCondition}
-            placeholderTextColor={colors.textMuted}
-          />
-        </View>
-
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
           <Text style={styles.saveBtnText}>저장</Text>
         </TouchableOpacity>
@@ -219,6 +230,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.xs },
   rowSpacingTop: { marginTop: spacing.xs },
   halfInput: { flex: 1 },
+  derivedRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  derivedText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   input: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
