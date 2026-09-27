@@ -87,6 +87,8 @@ export default function CalendarScreen({ navigation }: Props) {
   const recentRecords = useMemo(() => records.slice(0, RECENT_COUNT), [records]);
 
   const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
+  const selectedDaySwimMeters = selectedRecords.reduce((sum, r) => sum + (r.distanceMeters ?? 0), 0);
+  const selectedDayCalories = selectedDate ? monthActivity[selectedDate]?.activeCalories ?? 0 : 0;
   const header = todayHeaderParts();
 
   const totalDistance = useMemo(() => totalDistanceMeters(records), [records]);
@@ -169,10 +171,7 @@ export default function CalendarScreen({ navigation }: Props) {
               const dayCalories = monthActivity[date.dateString]?.activeCalories ?? 0;
               const isToday = date.dateString === todayString();
               return (
-                <TouchableOpacity
-                  style={styles.dayCell}
-                  onPress={() => dayRecords.length && setSelectedDate(date.dateString)}
-                >
+                <TouchableOpacity style={styles.dayCell} onPress={() => setSelectedDate(date.dateString)}>
                   <View style={[styles.dayNumberWrap, isToday && styles.dayNumberWrapToday]}>
                     <Text
                       style={[
@@ -246,16 +245,27 @@ export default function CalendarScreen({ navigation }: Props) {
                 <Text style={styles.modalClose}>닫기</Text>
               </TouchableOpacity>
             </View>
-            {selectedRecords.map((r) => (
-              <RecordCard
-                key={r.id}
-                record={r}
-                onPress={() => {
-                  setSelectedDate(null);
-                  navigation.navigate('RecordDetail', { id: r.id });
-                }}
-              />
-            ))}
+
+            <ScrollView>
+              <View style={styles.modalRingRow}>
+                <ActivityRings activeCalories={selectedDayCalories} swimMeters={selectedDaySwimMeters} />
+              </View>
+
+              {selectedRecords.length > 0 ? (
+                selectedRecords.map((r) => (
+                  <RecordCard
+                    key={r.id}
+                    record={r}
+                    onPress={() => {
+                      setSelectedDate(null);
+                      navigation.navigate('RecordDetail', { id: r.id });
+                    }}
+                  />
+                ))
+              ) : (
+                <Text style={styles.modalEmpty}>이 날은 남긴 수영 기록이 없어요.</Text>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -371,4 +381,6 @@ const styles = StyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontFamily: fonts.bold, color: colors.text },
   modalClose: { color: colors.blueSea, fontFamily: fonts.bold },
+  modalRingRow: { alignItems: 'center', marginBottom: spacing.sm },
+  modalEmpty: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
 });
