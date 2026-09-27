@@ -48,7 +48,11 @@ export default function VideoPlayerModal({ videoId, onClose }: Props) {
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.close}>{'‹ 닫기'}</Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => Linking.openURL(youtubeWatchUrl(videoId))}>
+            <Text style={styles.openExternal}>YouTube 앱에서 보기</Text>
+          </TouchableOpacity>
         </View>
+        <Text style={styles.hint}>일부 영상은 만든 사람이 앱 내 재생을 막아둬서, 재생이 안 되면 위 버튼을 눌러주세요.</Text>
         <WebView
           source={{ html: embedHtml(videoId) }}
           style={styles.webview}
@@ -63,7 +67,22 @@ export default function VideoPlayerModal({ videoId, onClose }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.sm },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
+  },
   close: { color: colors.white, fontFamily: fonts.semibold, fontSize: 15 },
+  openExternal: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 13 },
+  hint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xs,
+  },
   webview: { flex: 1 },
 });

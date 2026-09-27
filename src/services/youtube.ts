@@ -24,7 +24,7 @@ export async function searchSwimVideos(query: string, maxResults = 8): Promise<Y
   try {
     const searchRes = await fetch(
       `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}` +
-        `&q=${encodeURIComponent(query)}&relevanceLanguage=ko&key=${API_KEY}`
+        `&videoEmbeddable=true&q=${encodeURIComponent(query)}&relevanceLanguage=ko&key=${API_KEY}`
     );
     const searchJson = await searchRes.json();
     const ids: string[] = (searchJson.items ?? [])
