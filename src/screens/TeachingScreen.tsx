@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,14 +11,9 @@ import {
 } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import ComingSoonScreen from './ComingSoonScreen';
+import VideoPlayerModal from '../components/VideoPlayerModal';
 import { colors, fonts, radius, spacing } from '../theme';
-import {
-  formatViewCount,
-  isYoutubeConfigured,
-  searchSwimVideos,
-  youtubeWatchUrl,
-  YoutubeVideo,
-} from '../services/youtube';
+import { formatViewCount, isYoutubeConfigured, searchSwimVideos, YoutubeVideo } from '../services/youtube';
 
 const TOP_QUERY = '수영 팁 shorts';
 
@@ -30,9 +24,17 @@ const CATEGORIES: { title: string; query: string }[] = [
   { title: '장비 리뷰', query: '수영 고글 수모 리뷰' },
 ];
 
-function VideoThumb({ video, style }: { video: YoutubeVideo; style?: any }) {
+function VideoThumb({
+  video,
+  style,
+  onPress,
+}: {
+  video: YoutubeVideo;
+  style?: any;
+  onPress: () => void;
+}) {
   return (
-    <TouchableOpacity style={[styles.thumbCard, style]} onPress={() => Linking.openURL(youtubeWatchUrl(video.id))}>
+    <TouchableOpacity style={[styles.thumbCard, style]} onPress={onPress}>
       <Image source={{ uri: video.thumbnailUrl }} style={styles.thumbImage} />
       <Text style={styles.thumbTitle} numberOfLines={2}>
         {video.title}
@@ -44,7 +46,15 @@ function VideoThumb({ video, style }: { video: YoutubeVideo; style?: any }) {
   );
 }
 
-function CategoryRow({ title, query }: { title: string; query: string }) {
+function CategoryRow({
+  title,
+  query,
+  onSelectVideo,
+}: {
+  title: string;
+  query: string;
+  onSelectVideo: (id: string) => void;
+}) {
   const [videos, setVideos] = useState<YoutubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,7 +85,9 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
-          renderItem={({ item }) => <VideoThumb video={item} style={styles.categoryThumb} />}
+          renderItem={({ item }) => (
+            <VideoThumb video={item} style={styles.categoryThumb} onPress={() => onSelectVideo(item.id)} />
+          )}
         />
       )}
     </View>
@@ -85,6 +97,7 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
 export default function TeachingScreen() {
   const [topVideos, setTopVideos] = useState<YoutubeVideo[]>([]);
   const [loadingTop, setLoadingTop] = useState(true);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useEffect(() => {
     searchSwimVideos(TOP_QUERY, 4).then((v) => {
@@ -114,15 +127,17 @@ export default function TeachingScreen() {
         ) : (
           <View style={styles.topGrid}>
             {topVideos.slice(0, 4).map((v) => (
-              <VideoThumb key={v.id} video={v} style={styles.topThumb} />
+              <VideoThumb key={v.id} video={v} style={styles.topThumb} onPress={() => setPlayingId(v.id)} />
             ))}
           </View>
         )}
 
         {CATEGORIES.map((c) => (
-          <CategoryRow key={c.title} title={c.title} query={c.query} />
+          <CategoryRow key={c.title} title={c.title} query={c.query} onSelectVideo={setPlayingId} />
         ))}
       </ScrollView>
+
+      <VideoPlayerModal videoId={playingId} onClose={() => setPlayingId(null)} />
     </ScreenBackground>
   );
 }
