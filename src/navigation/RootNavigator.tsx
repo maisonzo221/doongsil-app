@@ -9,7 +9,8 @@ import RecordDetailScreen from '../screens/RecordDetailScreen';
 import StatDetailScreen from '../screens/StatDetailScreen';
 import ShopScreen from '../screens/ShopScreen';
 import TeachingScreen from '../screens/TeachingScreen';
-import TipRoomScreen from '../screens/TipRoomScreen';
+import TipRoomHomeScreen from '../screens/tiproom/TipRoomHomeScreen';
+import PostDetailScreen from '../screens/tiproom/PostDetailScreen';
 import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import GroupsScreen from '../screens/social/GroupsScreen';
@@ -25,6 +26,7 @@ import {
 import { colors, fonts } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList, GroupsStackParamList } from './socialTypes';
+import { TipRoomStackParamList } from './tipRoomTypes';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { getCurrentUser, UserProfile } from '../storage/auth';
 
@@ -32,6 +34,7 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
 const GroupsStack = createNativeStackNavigator<GroupsStackParamList>();
+const TipRoomStack = createNativeStackNavigator<TipRoomStackParamList>();
 
 const TAB_ICON: Record<keyof RootTabParamList, React.ComponentType<{ color: string; size?: number }>> = {
   Calendar: CalendarIcon,
@@ -108,6 +111,19 @@ function GroupsStackNavigator() {
   );
 }
 
+function TipRoomStackNavigator() {
+  return (
+    <TipRoomStack.Navigator screenOptions={{ headerShown: false }}>
+      <TipRoomStack.Screen name="TipRoomHome" component={TipRoomHomeScreen} />
+      <TipRoomStack.Screen
+        name="PostDetail"
+        component={PostDetailScreen}
+        options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
+    </TipRoomStack.Navigator>
+  );
+}
+
 function AppTabs() {
   return (
     <Tab.Navigator
@@ -132,7 +148,7 @@ function AppTabs() {
         </>
       )}
       <Tab.Screen name="Teaching" component={TeachingScreen} />
-      <Tab.Screen name="TipRoom" component={TipRoomScreen} />
+      <Tab.Screen name="TipRoom" component={TipRoomStackNavigator} />
       <Tab.Screen name="Shop" component={ShopScreen} />
     </Tab.Navigator>
   );

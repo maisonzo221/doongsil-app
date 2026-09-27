@@ -1,12 +1,157 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import ScreenBackground from '../components/ScreenBackground';
 import ComingSoonScreen from './ComingSoonScreen';
+import { colors, fonts, radius, spacing } from '../theme';
+import {
+  formatViewCount,
+  isYoutubeConfigured,
+  searchSwimVideos,
+  youtubeWatchUrl,
+  YoutubeVideo,
+} from '../services/youtube';
 
-export default function TeachingScreen() {
+const TOP_QUERY = '수영 팁 shorts';
+
+const CATEGORIES: { title: string; query: string }[] = [
+  { title: '자유형 팁', query: '자유형 영법 교정' },
+  { title: '턴 & 출발', query: '수영 턴 출발 연습' },
+  { title: '초보자 가이드', query: '수영 초보 배우기' },
+  { title: '장비 리뷰', query: '수영 고글 수모 리뷰' },
+];
+
+function VideoThumb({ video, style }: { video: YoutubeVideo; style?: any }) {
   return (
-    <ComingSoonScreen
-      title="티칭"
-      emoji="🎬"
-      description={'수영 관련 인기 영상을 모아 보여드릴게요.\n조금만 기다려주세요!'}
-    />
+    <TouchableOpacity style={[styles.thumbCard, style]} onPress={() => Linking.openURL(youtubeWatchUrl(video.id))}>
+      <Image source={{ uri: video.thumbnailUrl }} style={styles.thumbImage} />
+      <Text style={styles.thumbTitle} numberOfLines={2}>
+        {video.title}
+      </Text>
+      <Text style={styles.thumbMeta} numberOfLines={1}>
+        {video.channelTitle} · {formatViewCount(video.viewCount)}
+      </Text>
+    </TouchableOpacity>
   );
 }
+
+function CategoryRow({ title, query }: { title: string; query: string }) {
+  const [videos, setVideos] = useState<YoutubeVideo[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    searchSwimVideos(query, 6).then((v) => {
+      if (!cancelled) {
+        setVideos(v);
+        setLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [query]);
+
+  if (!loading && videos.length === 0) return null;
+
+  return (
+    <View style={styles.categorySection}>
+      <Text style={styles.categoryTitle}>{title}</Text>
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
+      ) : (
+        <FlatList
+          data={videos}
+          keyExtractor={(v) => v.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryList}
+          renderItem={({ item }) => <VideoThumb video={item} style={styles.categoryThumb} />}
+        />
+      )}
+    </View>
+  );
+}
+
+export default function TeachingScreen() {
+  const [topVideos, setTopVideos] = useState<YoutubeVideo[]>([]);
+  const [loadingTop, setLoadingTop] = useState(true);
+
+  useEffect(() => {
+    searchSwimVideos(TOP_QUERY, 4).then((v) => {
+      setTopVideos(v);
+      setLoadingTop(false);
+    });
+  }, []);
+
+  if (!isYoutubeConfigured) {
+    return (
+      <ComingSoonScreen
+        title="티칭"
+        emoji="🎬"
+        description={'수영 관련 인기 영상을 모아 보여드릴게요.\n조금만 기다려주세요!'}
+      />
+    );
+  }
+
+  return (
+    <ScreenBackground>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.pageTitle}>티칭</Text>
+
+        <Text style={styles.topTitle}>오늘의 인기 쇼츠</Text>
+        {loadingTop ? (
+          <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
+        ) : (
+          <View style={styles.topGrid}>
+            {topVideos.slice(0, 4).map((v) => (
+              <VideoThumb key={v.id} video={v} style={styles.topThumb} />
+            ))}
+          </View>
+        )}
+
+        {CATEGORIES.map((c) => (
+          <CategoryRow key={c.title} title={c.title} query={c.query} />
+        ))}
+      </ScrollView>
+    </ScreenBackground>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { padding: spacing.lg, paddingBottom: spacing.xl },
+  pageTitle: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm },
+  topTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
+  topGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.lg },
+  topThumb: { width: '47%' },
+  thumbCard: { backgroundColor: colors.card, borderRadius: radius.md, overflow: 'hidden' },
+  thumbImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.cardSoft },
+  thumbTitle: {
+    fontFamily: fonts.semibold,
+    color: colors.text,
+    fontSize: 12,
+    padding: spacing.hairline + 2,
+    paddingBottom: 2,
+  },
+  thumbMeta: {
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
+    fontSize: 10,
+    paddingHorizontal: spacing.hairline + 2,
+    paddingBottom: spacing.hairline,
+  },
+  categorySection: { marginBottom: spacing.md },
+  categoryTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
+  categoryList: { gap: spacing.xs },
+  categoryThumb: { width: 160 },
+  categoryLoading: { marginVertical: spacing.sm },
+});

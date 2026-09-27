@@ -1,7 +1,8 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../theme';
+import { SHOP_NEWS } from '../data/shopNews';
 
 const COMING_SOON_ITEMS = [
   { emoji: '\u{1F3CA}', label: '둥실 물안경' },
@@ -22,7 +23,29 @@ export default function ShopScreen() {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>곧 만나요</Text>
+        <Text style={styles.sectionTitle}>신제품뉴스</Text>
+        {SHOP_NEWS.map((article) => (
+          <TouchableOpacity
+            key={article.id}
+            style={styles.newsCard}
+            onPress={() => Linking.openURL(article.link)}
+          >
+            <View style={styles.newsHeaderRow}>
+              <Text style={styles.newsEmoji}>{article.emoji}</Text>
+              <View style={styles.newsBrandBadge}>
+                <Text style={styles.newsBrandText}>{article.brand}</Text>
+              </View>
+            </View>
+            <Text style={styles.newsTitle}>{article.title}</Text>
+            <Text style={styles.newsSummary}>{article.summary}</Text>
+            <View style={styles.newsFooterRow}>
+              <Text style={styles.newsSource}>{article.source}</Text>
+              <Text style={styles.newsLink}>구매하러 가기 →</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>곧 만나요</Text>
         {COMING_SOON_ITEMS.map((item) => (
           <View key={item.label} style={styles.itemCard}>
             <Text style={styles.itemEmoji}>{item.emoji}</Text>
@@ -51,6 +74,38 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 17, fontFamily: fonts.bold, color: colors.text, marginBottom: 4 },
   bannerSubtitle: { color: colors.textMuted, fontFamily: fonts.regular, textAlign: 'center', lineHeight: 20 },
   sectionTitle: { fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.xs },
+  sectionTitleSpaced: { marginTop: spacing.lg },
+  newsCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  newsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
+  newsEmoji: { fontSize: 20 },
+  newsBrandBadge: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.hairline + 2,
+    paddingVertical: 2,
+  },
+  newsBrandText: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 11 },
+  newsTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginTop: spacing.xs },
+  newsSummary: {
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  newsFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  newsSource: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 11 },
+  newsLink: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 12 },
   itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
