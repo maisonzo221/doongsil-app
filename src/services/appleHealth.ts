@@ -137,18 +137,7 @@ export async function getTodaySwimWorkout(dateString: string): Promise<HealthImp
   };
 }
 
-/** 오늘 하루 총 활동 칼로리와 수영 거리 — 캘린더 상단 링용. */
-export async function getTodayActivitySummary(
-  dateString: string
-): Promise<TodayActivitySummary | null> {
-  if (Platform.OS !== 'ios') return null;
-
-  const available = await isHealthAvailable();
-  if (!available) return null;
-
-  const granted = await requestHealthAuthorization();
-  if (!granted) return null;
-
+async function fetchDayActivity(dateString: string): Promise<TodayActivitySummary> {
   const [y, m, d] = dateString.split('-').map(Number);
   const startDate = new Date(y, m - 1, d, 0, 0, 0);
   const endDate = new Date(y, m - 1, d, 23, 59, 59);
@@ -178,4 +167,40 @@ export async function getTodayActivitySummary(
   }
 
   return { activeCalories, swimMeters };
+}
+
+/** 오늘 하루 총 활동 칼로리와 수영 거리 — 캘린더 상단 링용. */
+export async function getTodayActivitySummary(
+  dateString: string
+): Promise<TodayActivitySummary | null> {
+  if (Platform.OS !== 'ios') return null;
+  const available = await isHealthAvailable();
+  if (!available) return null;
+  const granted = await requestHealthAuthorization();
+  if (!granted) return null;
+  return fetchDayActivity(dateString);
+}
+
+/** 한 달치 하루 단위 활동 요약 — 캘린더 날짜 칸마다 미니 링을 그리는 데 쓴다. */
+export async function getMonthActivitySummaries(
+  yearMonth: string
+): Promise<Record<string, TodayActivitySummary>> {
+  if (Platform.OS !== 'ios') return {};
+  const available = await isHealthAvailable();
+  if (!available) return {};
+  const granted = await requestHealthAuthorization();
+  if (!granted) return {};
+
+  const [y, m] = yearMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
+  const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
+  if (lastDay < 1) return {};
+
+  const dates = Array.from({ length: lastDay }, (_, i) => `${yearMonth}-${String(i + 1).padStart(2, '0')}`);
+  const results = await Promise.all(
+    dates.map(async (dateString) => [dateString, await fetchDayActivity(dateString)] as const)
+  );
+  return Object.fromEntries(results);
 }

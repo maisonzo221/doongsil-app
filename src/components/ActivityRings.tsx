@@ -8,41 +8,32 @@ import { colors, fonts, spacing } from '../theme';
 const DEFAULT_CALORIE_GOAL = 500;
 const DEFAULT_SWIM_GOAL_METERS = 1000;
 
-const SIZE = 132;
-const STROKE = 14;
-const OUTER_R = SIZE / 2 - STROKE / 2;
-const INNER_R = OUTER_R - STROKE - 6;
-
 interface RingProps {
+  size: number;
   radius: number;
+  strokeWidth: number;
   progress: number; // 0~1
   trackColor: string;
   color: string;
 }
 
-function Ring({ radius, progress, trackColor, color }: RingProps) {
+function Ring({ size, radius, strokeWidth, progress, trackColor, color }: RingProps) {
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(1, Math.max(0, progress));
+  const center = size / 2;
   return (
     <>
+      <Circle cx={center} cy={center} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="none" />
       <Circle
-        cx={SIZE / 2}
-        cy={SIZE / 2}
-        r={radius}
-        stroke={trackColor}
-        strokeWidth={STROKE}
-        fill="none"
-      />
-      <Circle
-        cx={SIZE / 2}
-        cy={SIZE / 2}
+        cx={center}
+        cy={center}
         r={radius}
         stroke={color}
-        strokeWidth={STROKE}
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray={`${circumference * clamped} ${circumference}`}
         fill="none"
-        transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
+        transform={`rotate(-90 ${center} ${center})`}
       />
     </>
   );
@@ -55,6 +46,11 @@ interface Props {
   swimGoalMeters?: number;
 }
 
+const SIZE = 132;
+const STROKE = 14;
+const OUTER_R = SIZE / 2 - STROKE / 2;
+const INNER_R = OUTER_R - STROKE - 6;
+
 export default function ActivityRings({
   activeCalories,
   swimMeters,
@@ -66,13 +62,17 @@ export default function ActivityRings({
       <View style={styles.ringWrap}>
         <Svg width={SIZE} height={SIZE}>
           <Ring
+            size={SIZE}
             radius={OUTER_R}
+            strokeWidth={STROKE}
             progress={activeCalories / calorieGoal}
             trackColor={colors.ringActivityTrack}
             color={colors.ringActivity}
           />
           <Ring
+            size={SIZE}
             radius={INNER_R}
+            strokeWidth={STROKE}
             progress={swimMeters / swimGoalMeters}
             trackColor={colors.ringSwimTrack}
             color={colors.ringSwim}
@@ -92,6 +92,48 @@ export default function ActivityRings({
         </View>
       </View>
     </View>
+  );
+}
+
+interface MiniProps {
+  activeCalories: number;
+  swimMeters: number;
+  calorieGoal?: number;
+  swimGoalMeters?: number;
+  size?: number;
+}
+
+const MINI_STROKE = 2.4;
+
+/** 캘린더 날짜 칸 안에 들어가는 아주 작은 이중 링. */
+export function MiniActivityRing({
+  activeCalories,
+  swimMeters,
+  calorieGoal = DEFAULT_CALORIE_GOAL,
+  swimGoalMeters = DEFAULT_SWIM_GOAL_METERS,
+  size = 20,
+}: MiniProps) {
+  const outerR = size / 2 - MINI_STROKE / 2;
+  const innerR = outerR - MINI_STROKE - 1.5;
+  return (
+    <Svg width={size} height={size}>
+      <Ring
+        size={size}
+        radius={outerR}
+        strokeWidth={MINI_STROKE}
+        progress={activeCalories / calorieGoal}
+        trackColor={colors.ringActivityTrack}
+        color={colors.ringActivity}
+      />
+      <Ring
+        size={size}
+        radius={innerR}
+        strokeWidth={MINI_STROKE}
+        progress={swimMeters / swimGoalMeters}
+        trackColor={colors.ringSwimTrack}
+        color={colors.ringSwim}
+      />
+    </Svg>
   );
 }
 

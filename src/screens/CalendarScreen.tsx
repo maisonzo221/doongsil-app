@@ -8,13 +8,17 @@ import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
 import RecordCard from '../components/RecordCard';
 import DailyOceanCard from '../components/DailyOceanCard';
-import ActivityRings from '../components/ActivityRings';
+import ActivityRings, { MiniActivityRing } from '../components/ActivityRings';
 import RoutineRecommendations from '../components/RoutineRecommendations';
 import { NotingIcon } from '../components/icons/TabIcons';
 import { SwimRecord } from '../types';
-import { colors, fonts, moodColors, radius, spacing } from '../theme';
+import { colors, fonts, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
-import { getTodayActivitySummary, TodayActivitySummary } from '../services/appleHealth';
+import {
+  getMonthActivitySummaries,
+  getTodayActivitySummary,
+  TodayActivitySummary,
+} from '../services/appleHealth';
 import { computeStreak } from '../utils/streak';
 import { monthlySummary, totalDistanceLabel } from '../utils/summary';
 import { avgPaceSecPer100m, avgStrokeCount, avgSwolf, totalDistanceMeters } from '../utils/stats';
@@ -23,7 +27,6 @@ import { currentYearMonth, formatMonthLabel, formatDateLabel, todayString } from
 import { CalendarStackParamList } from '../navigation/types';
 
 const RECENT_COUNT = 5;
-const MAX_DOTS_PER_DAY = 3;
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'CalendarHome'>;
 
@@ -46,6 +49,7 @@ export default function CalendarScreen({ navigation }: Props) {
     activeCalories: 0,
     swimMeters: 0,
   });
+  const [monthActivity, setMonthActivity] = useState<Record<string, TodayActivitySummary>>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -54,6 +58,12 @@ export default function CalendarScreen({ navigation }: Props) {
         if (summary) setTodayActivity(summary);
       });
     }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      getMonthActivitySummaries(visibleMonth).then(setMonthActivity);
+    }, [visibleMonth])
   );
 
   const recordsByDate = useMemo(() => {
@@ -154,7 +164,9 @@ export default function CalendarScreen({ navigation }: Props) {
             }}
             dayComponent={({ date, state }: any) => {
               if (!date) return <View />;
-              const dayRecords = (recordsByDate.get(date.dateString) ?? []).slice(0, MAX_DOTS_PER_DAY);
+              const dayRecords = recordsByDate.get(date.dateString) ?? [];
+              const daySwimMeters = dayRecords.reduce((sum, r) => sum + (r.distanceMeters ?? 0), 0);
+              const dayCalories = monthActivity[date.dateString]?.activeCalories ?? 0;
               const isToday = date.dateString === todayString();
               return (
                 <TouchableOpacity
@@ -172,11 +184,7 @@ export default function CalendarScreen({ navigation }: Props) {
                       {date.day}
                     </Text>
                   </View>
-                  <View style={styles.dotsRow}>
-                    {dayRecords.map((r) => (
-                      <View key={r.id} style={[styles.dot, { backgroundColor: moodColors[r.mood] }]} />
-                    ))}
-                  </View>
+                  <MiniActivityRing activeCalories={dayCalories} swimMeters={daySwimMeters} />
                 </TouchableOpacity>
               );
             }}
@@ -319,8 +327,6 @@ const styles = StyleSheet.create({
   dayNumberWrapToday: { backgroundColor: colors.primary },
   dayNumber: { color: colors.text, fontSize: 14, fontFamily: fonts.medium },
   dayNumberToday: { color: colors.white, fontFamily: fonts.bold },
-  dotsRow: { flexDirection: 'row', gap: 3, height: 6 },
-  dot: { width: 5, height: 5, borderRadius: 2.5 },
   distanceCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
