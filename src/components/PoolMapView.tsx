@@ -8,20 +8,24 @@ interface Props {
   pools: OfficialPool[];
 }
 
-// 카카오맵/구글맵을 화면에 embed하려면 API 키가 필요하지만, CARTO의 Positron
-// 타일(OpenStreetMap 데이터 기반)은 키 없이 쓸 수 있고 기본 OSM 타일보다
-// 훨씬 깔끔한 미니멀 스타일이라 앱 톤과도 잘 맞는다. 마커도 Leaflet 기본
-// 파란 핀 아이콘 대신, 브랜드 색(emerald) 원형 점으로 그려서 더 모던하게 보이게 했다.
+// CARTO/Mapbox/구글맵의 깔끔한 타일은 대부분 API 키(+유료 플랜)가 필요하다 —
+// 실제로 CARTO 무료 타일은 이제 키 없이는 막혀 있다(워터마크로 확인됨).
+// OpenFreeMap(openfreemap.org)은 벡터 타일을 키/가입 없이 무기한 무료로 제공하는
+// 서비스라, MapLibre GL로 그리면 네이버지도/T맵처럼 도로·건물이 벡터로 또렷하게
+// 그려지는 지도를 만들 수 있다. 마커도 Leaflet 기본 파란 핀 대신 브랜드 색
+// (emerald) 원형 점으로 그려서 앱 톤에 맞췄다.
 function mapHtml(points: { id: string; name: string; addr: string; lat: number; lng: number }[]): string {
-  const center = points.length ? [points[0].lat, points[0].lng] : [37.5665, 126.978];
+  const center = points.length ? [points[0].lng, points[0].lat] : [126.978, 37.5665];
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 <style>
   html,body,#map{margin:0;padding:0;height:100%;background:${colors.background};}
-  .leaflet-control-attribution{font-size:9px;}
+  .maplibregl-ctrl-attrib{font-size:9px;}
+  .pin-dot{width:18px;height:18px;border-radius:50%;background:#0EA894;border:2px solid #ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
   .pin-popup{font-family:-apple-system,sans-serif;}
   .pin-popup b{font-size:14px;color:#0A3358;}
   .pin-popup .addr{font-size:12px;color:#5F7A8C;margin-top:2px;}
@@ -30,45 +34,40 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 </head>
 <body>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const map = L.map('map', { zoomControl: true, attributionControl: true })
-    .setView([${center[0]}, ${center[1]}], ${points.length > 1 ? 12 : 15});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    maxZoom: 19,
-    subdomains: 'abcd'
-  }).addTo(map);
-
   const points = ${JSON.stringify(points)};
-  const markers = [];
-  points.forEach((p) => {
-    const marker = L.circleMarker([p.lat, p.lng], {
-      radius: 9,
-      fillColor: '#0EA894',
-      color: '#ffffff',
-      weight: 2,
-      fillOpacity: 1
-    }).addTo(map);
-    marker.bindPopup(
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [${center[0]}, ${center[1]}],
+    zoom: ${points.length > 1 ? 11 : 14}
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  const bounds = new maplibregl.LngLatBounds();
+  points.forEach(function (p) {
+    const el = document.createElement('div');
+    el.className = 'pin-dot';
+
+    const popup = new maplibregl.Popup({ offset: 14 }).setHTML(
       '<div class="pin-popup"><b>' + p.name + '</b>' +
       '<div class="addr">' + p.addr + '</div>' +
       '<a href="#" data-id="' + p.id + '">길찾기 열기</a></div>'
     );
-    marker.on('popupopen', function () {
-      const links = document.querySelectorAll('.pin-popup a[data-id="' + p.id + '"]');
-      links.forEach(function (a) {
+    popup.on('open', function () {
+      document.querySelectorAll('.pin-popup a[data-id="' + p.id + '"]').forEach(function (a) {
         a.onclick = function (e) {
           e.preventDefault();
           window.ReactNativeWebView.postMessage(p.id);
         };
       });
     });
-    markers.push(marker);
+
+    new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
+    bounds.extend([p.lng, p.lat]);
   });
-  if (markers.length > 1) {
-    const group = L.featureGroup(markers);
-    map.fitBounds(group.getBounds().pad(0.25));
+  if (points.length > 1) {
+    map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   }
 </script>
 </body>
