@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Modal,
   ScrollView,
@@ -24,6 +25,12 @@ import {
   Pool,
   PoolInput,
 } from '../../storage/tipRoom';
+import {
+  isPoolDataConfigured,
+  mapLinkFor,
+  OfficialPool,
+  searchOfficialPools,
+} from '../../services/poolData';
 import { getCurrentUser, UserProfile } from '../../storage/auth';
 
 type Props = NativeStackScreenProps<TipRoomStackParamList, 'TipRoomHome'>;
@@ -59,6 +66,31 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [poolModal, setPoolModal] = useState(false);
   const [poolDraft, setPoolDraft] = useState<PoolInput>({ name: '' });
 
+  const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
+  const [loadingOfficial, setLoadingOfficial] = useState(false);
+
+  useEffect(() => {
+    if (tab !== 'pools') return;
+    if (!poolSearch.trim()) {
+      setOfficialPools([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingOfficial(true);
+    const timer = setTimeout(() => {
+      searchOfficialPools(poolSearch).then((results) => {
+        if (!cancelled) {
+          setOfficialPools(results);
+          setLoadingOfficial(false);
+        }
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [tab, poolSearch]);
+
   const reload = useCallback(async () => {
     const [user, postList, poolList] = await Promise.all([getCurrentUser(), getBoardPosts(), getPools()]);
     setMe(user);
@@ -91,8 +123,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   const disabled = !me || me.provider !== 'apple';
 
-  const filteredPools = pools.filter((p) => {
-    if (tab === 'freeSwim' && !p.freeSwimNote) return false;
+  const filteredFreeSwimPools = pools.filter((p) => {
+    if (!p.freeSwimNote) return false;
     if (!poolSearch.trim()) return true;
     const q = poolSearch.trim().toLowerCase();
     return p.name.toLowerCase().includes(q) || (p.region ?? '').toLowerCase().includes(q);
@@ -141,6 +173,48 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             ))}
           </ScrollView>
+        ) : tab === 'pools' ? (
+          <ScrollView contentContainerStyle={styles.list}>
+            <TextInput
+              style={styles.searchInput}
+              value={poolSearch}
+              onChangeText={setPoolSearch}
+              placeholder="수영장 이름이나 지역(예: 강남구)으로 검색"
+              placeholderTextColor={colors.textMuted}
+            />
+            {!isPoolDataConfigured ? (
+              <Text style={styles.empty}>수영장 검색 기능을 준비하고 있어요. 조금만 기다려주세요!</Text>
+            ) : loadingOfficial ? (
+              <ActivityIndicator color={colors.primary} style={styles.loading} />
+            ) : !poolSearch.trim() ? (
+              <Text style={styles.empty}>수영장 이름이나 지역을 검색해보세요. 행정안전부 공식 데이터예요.</Text>
+            ) : officialPools.length === 0 ? (
+              <Text style={styles.empty}>검색 결과가 없어요.</Text>
+            ) : (
+              officialPools.map((p) => {
+                const mapLink = mapLinkFor(p);
+                return (
+                  <View key={p.id} style={styles.poolCard}>
+                    <Text style={styles.poolName}>{p.name}</Text>
+                    <Text style={styles.poolMeta}>{p.roadAddress}</Text>
+                    <Text style={styles.poolStatus}>{p.statusName}</Text>
+                    <View style={styles.poolActionsRow}>
+                      {p.phone && (
+                        <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
+                          <Text style={styles.poolAction}>전화하기</Text>
+                        </TouchableOpacity>
+                      )}
+                      {mapLink && (
+                        <TouchableOpacity onPress={() => Linking.openURL(mapLink)}>
+                          <Text style={styles.poolAction}>지도에서 보기</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={styles.list}>
             <TextInput
@@ -151,24 +225,20 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
               placeholderTextColor={colors.textMuted}
             />
             <TouchableOpacity style={styles.addRow} onPress={() => setPoolModal(true)}>
-              <Text style={styles.addRowText}>+ 수영장 정보 추가하기</Text>
+              <Text style={styles.addRowText}>+ 자유수영 정보 추가하기</Text>
             </TouchableOpacity>
-            {filteredPools.length === 0 && (
+            {filteredFreeSwimPools.length === 0 && (
               <Text style={styles.empty}>
-                {tab === 'freeSwim'
-                  ? '아직 자유수영 정보가 등록된 수영장이 없어요. 알고 있는 정보를 추가해보세요.'
-                  : '아직 등록된 수영장이 없어요. 알고 있는 수영장 정보를 추가해보세요.'}
+                아직 자유수영 정보가 등록된 수영장이 없어요. 알고 있는 정보를 추가해보세요.
               </Text>
             )}
-            {filteredPools.map((p) => (
+            {filteredFreeSwimPools.map((p) => (
               <View key={p.id} style={styles.poolCard}>
                 <Text style={styles.poolName}>{p.name}</Text>
                 {p.region && <Text style={styles.poolMeta}>{p.region}</Text>}
                 {p.address && <Text style={styles.poolMeta}>{p.address}</Text>}
-                {tab === 'freeSwim' && p.freeSwimNote && (
-                  <Text style={styles.poolFreeSwim}>{p.freeSwimNote}</Text>
-                )}
-                {tab === 'pools' && p.pricingNote && <Text style={styles.poolMeta}>요금: {p.pricingNote}</Text>}
+                {p.freeSwimNote && <Text style={styles.poolFreeSwim}>{p.freeSwimNote}</Text>}
+                {p.pricingNote && <Text style={styles.poolMeta}>요금: {p.pricingNote}</Text>}
                 <View style={styles.poolActionsRow}>
                   {p.phone && (
                     <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
@@ -241,7 +311,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, styles.modalCardTall]}>
             <ScrollView>
-              <Text style={styles.modalTitle}>수영장 정보 추가</Text>
+              <Text style={styles.modalTitle}>자유수영 정보 추가</Text>
               <TextInput
                 style={styles.input}
                 value={poolDraft.name}
@@ -347,9 +417,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: colors.text,
   },
+  loading: { marginTop: spacing.lg },
   poolCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.hairline + 4 },
   poolName: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
   poolMeta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  poolStatus: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 11, marginTop: 2 },
   poolFreeSwim: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12, marginTop: 4 },
   poolActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   poolAction: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 12 },
