@@ -13,6 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import PoolMapModal from '../../components/PoolMapModal';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
@@ -29,6 +30,7 @@ import {
   isPoolDataConfigured,
   mapLinkFor,
   OfficialPool,
+  registrationSearchLinkFor,
   searchOfficialPools,
 } from '../../services/poolData';
 import { getCurrentUser, UserProfile } from '../../storage/auth';
@@ -68,6 +70,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
+  const [mapVisible, setMapVisible] = useState(false);
 
   useEffect(() => {
     if (tab !== 'pools') return;
@@ -191,28 +194,36 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
             ) : officialPools.length === 0 ? (
               <Text style={styles.empty}>검색 결과가 없어요.</Text>
             ) : (
-              officialPools.map((p) => {
-                const mapLink = mapLinkFor(p);
-                return (
-                  <View key={p.id} style={styles.poolCard}>
-                    <Text style={styles.poolName}>{p.name}</Text>
-                    <Text style={styles.poolMeta}>{p.roadAddress}</Text>
-                    <Text style={styles.poolStatus}>{p.statusName}</Text>
-                    <View style={styles.poolActionsRow}>
-                      {p.phone && (
-                        <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
-                          <Text style={styles.poolAction}>전화하기</Text>
+              <>
+                <TouchableOpacity style={styles.mapToggle} onPress={() => setMapVisible(true)}>
+                  <Text style={styles.mapToggleText}>{`🗺️ 지도에서 한 번에 보기 (${officialPools.length})`}</Text>
+                </TouchableOpacity>
+                {officialPools.map((p) => {
+                  const mapLink = mapLinkFor(p);
+                  return (
+                    <View key={p.id} style={styles.poolCard}>
+                      <Text style={styles.poolName}>{p.name}</Text>
+                      <Text style={styles.poolMeta}>{p.roadAddress}</Text>
+                      <Text style={styles.poolStatus}>{p.statusName}</Text>
+                      <View style={styles.poolActionsRow}>
+                        {p.phone && (
+                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
+                            <Text style={styles.poolAction}>전화하기</Text>
+                          </TouchableOpacity>
+                        )}
+                        {mapLink && (
+                          <TouchableOpacity onPress={() => Linking.openURL(mapLink)}>
+                            <Text style={styles.poolAction}>지도에서 보기</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity onPress={() => Linking.openURL(registrationSearchLinkFor(p))}>
+                          <Text style={styles.poolAction}>수강신청 찾기</Text>
                         </TouchableOpacity>
-                      )}
-                      {mapLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(mapLink)}>
-                          <Text style={styles.poolAction}>지도에서 보기</Text>
-                        </TouchableOpacity>
-                      )}
+                      </View>
                     </View>
-                  </View>
-                );
-              })
+                  );
+                })}
+              </>
             )}
           </ScrollView>
         ) : (
@@ -376,6 +387,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <PoolMapModal visible={mapVisible} pools={officialPools} onClose={() => setMapVisible(false)} />
     </ScreenBackground>
   );
 }
@@ -418,6 +431,14 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   loading: { marginTop: spacing.lg },
+  mapToggle: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.hairline + 4,
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  mapToggleText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 13 },
   poolCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.hairline + 4 },
   poolName: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
   poolMeta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },

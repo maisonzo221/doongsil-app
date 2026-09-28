@@ -91,3 +91,10 @@ export function mapLinkFor(pool: OfficialPool): string | undefined {
   if (pool.lat == null || pool.lng == null) return undefined;
   return `https://map.kakao.com/link/map/${encodeURIComponent(pool.name)},${pool.lat},${pool.lng}`;
 }
+
+// 정부 데이터셋엔 수강신청/자유수영 등록 페이지 링크가 없다. 없는 링크를 지어낼 수 없어서,
+// 그 수영장 이름으로 검색 결과를 바로 열어주는 방식으로 대신한다 — 실제로 존재하는
+// 등록 페이지를 사용자가 검색 한 번으로 바로 찾아갈 수 있다.
+export function registrationSearchLinkFor(pool: OfficialPool): string {
+  return `https://search.naver.com/search.naver?query=${encodeURIComponent(`${pool.name} 수강신청`)}`;
+}
