@@ -81,21 +81,36 @@ async function fetchByCondition(
     .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName));
 }
 
+function matchesAllTokens(pool: OfficialPool, tokens: string[]): boolean {
+  const haystack = `${pool.name} ${pool.roadAddress} ${pool.lotAddress}`;
+  return tokens.every((t) => haystack.includes(t));
+}
+
 /** 수영장 이름이나 지역(도로명주소/지번주소)으로 검색한다. 구 단위·동 단위 검색도 되게
- * 이름/도로명주소/지번주소 세 필드를 모두 훑어서 합친다. */
-export async function searchOfficialPools(query: string, maxResults = 50): Promise<OfficialPool[]> {
+ * 이름/도로명주소/지번주소 세 필드를 모두 훑어서 합친다.
+ *
+ * LIKE 검색은 검색어가 그대로 이어 붙은 문자열이어야 매치된다. 그런데 "서울 중구"라고
+ * 검색해도 실제 주소는 "서울특별시 중구 ..."라 "서울 중구"라는 문자열이 그대로 들어있지
+ * 않아서 매치가 안 된다. 그래서 여러 단어로 검색하면, 가장 구체적인 마지막 단어(보통
+ * 구/동 이름)로 서버 검색을 하고, 나머지 단어는 결과에 다 포함되는지 클라이언트에서 한 번
+ * 더 확인한다 — "중구"로 넓게 가져온 다음 "서울"도 포함된 것만 남기는 식이라, 대전 중구
+ * 같은 동명이인도 자연스럽게 걸러진다. */
+export async function searchOfficialPools(query: string, maxResults = 100): Promise<OfficialPool[]> {
   if (!API_KEY || !query.trim()) return [];
 
+  const tokens = query.trim().split(/\s+/).filter(Boolean);
+  const primary = tokens[tokens.length - 1];
+
   try {
-    const q = query.trim();
     const [byName, byRoadAddress, byLotAddress] = await Promise.all([
-      fetchByCondition('BPLC_NM', q, maxResults),
-      fetchByCondition('ROAD_NM_ADDR', q, maxResults),
-      fetchByCondition('LOTNO_ADDR', q, maxResults),
+      fetchByCondition('BPLC_NM', primary, maxResults),
+      fetchByCondition('ROAD_NM_ADDR', primary, maxResults),
+      fetchByCondition('LOTNO_ADDR', primary, maxResults),
     ]);
     const byId = new Map<string, OfficialPool>();
     [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
-    return Array.from(byId.values());
+    const all = Array.from(byId.values());
+    return tokens.length > 1 ? all.filter((p) => matchesAllTokens(p, tokens)) : all;
   } catch {
     return [];
   }
