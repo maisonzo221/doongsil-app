@@ -27,15 +27,20 @@ const CATEGORIES: { title: string; query: string }[] = [
 function VideoThumb({
   video,
   style,
+  vertical,
   onPress,
 }: {
   video: YoutubeVideo;
   style?: any;
+  vertical?: boolean;
   onPress: () => void;
 }) {
   return (
     <TouchableOpacity style={[styles.thumbCard, style]} onPress={onPress}>
-      <Image source={{ uri: video.thumbnailUrl }} style={styles.thumbImage} />
+      <Image
+        source={{ uri: video.thumbnailUrl }}
+        style={[styles.thumbImage, vertical && styles.thumbImageVertical]}
+      />
       <Text style={styles.thumbTitle} numberOfLines={2}>
         {video.title}
       </Text>
@@ -127,7 +132,13 @@ export default function TeachingScreen() {
         ) : (
           <View style={styles.topGrid}>
             {topVideos.slice(0, 4).map((v) => (
-              <VideoThumb key={v.id} video={v} style={styles.topThumb} onPress={() => setPlayingId(v.id)} />
+              <VideoThumb
+                key={v.id}
+                video={v}
+                style={styles.topThumb}
+                vertical
+                onPress={() => setPlayingId(v.id)}
+              />
             ))}
           </View>
         )}
@@ -143,13 +154,14 @@ export default function TeachingScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xl },
-  pageTitle: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm },
-  topTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
-  topGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.lg },
-  topThumb: { width: '47%' },
-  thumbCard: { backgroundColor: colors.card, borderRadius: radius.md, overflow: 'hidden' },
+  content: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xl },
+  pageTitle: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm, marginLeft: spacing.hairline },
+  topTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
+  topGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.hairline, marginBottom: spacing.lg },
+  topThumb: { width: '49.5%' },
+  thumbCard: { backgroundColor: colors.card, borderRadius: radius.sm, overflow: 'hidden' },
   thumbImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.cardSoft },
+  thumbImageVertical: { aspectRatio: 9 / 16 },
   thumbTitle: {
     fontFamily: fonts.semibold,
     color: colors.text,
@@ -165,8 +177,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.hairline,
   },
   categorySection: { marginBottom: spacing.md },
-  categoryTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
-  categoryList: { gap: spacing.xs },
-  categoryThumb: { width: 160 },
+  categoryTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
+  categoryList: { gap: spacing.hairline, paddingLeft: spacing.hairline },
+  categoryThumb: { width: 230 },
   categoryLoading: { marginVertical: spacing.sm },
 });
