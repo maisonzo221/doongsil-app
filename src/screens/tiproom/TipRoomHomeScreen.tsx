@@ -13,7 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
-import PoolMapModal from '../../components/PoolMapModal';
+import PoolMapView from '../../components/PoolMapView';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
@@ -70,7 +70,6 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
-  const [mapVisible, setMapVisible] = useState(false);
 
   useEffect(() => {
     if (tab !== 'pools') return;
@@ -195,9 +194,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
               <Text style={styles.empty}>검색 결과가 없어요.</Text>
             ) : (
               <>
-                <TouchableOpacity style={styles.mapToggle} onPress={() => setMapVisible(true)}>
-                  <Text style={styles.mapToggleText}>{`🗺️ 지도에서 한 번에 보기 (${officialPools.length})`}</Text>
-                </TouchableOpacity>
+                <PoolMapView pools={officialPools} />
                 {officialPools.map((p) => {
                   const mapLink = mapLinkFor(p);
                   return (
@@ -387,8 +384,6 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
-
-      <PoolMapModal visible={mapVisible} pools={officialPools} onClose={() => setMapVisible(false)} />
     </ScreenBackground>
   );
 }
@@ -431,14 +426,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   loading: { marginTop: spacing.lg },
-  mapToggle: {
-    backgroundColor: colors.cardSoft,
-    borderRadius: radius.pill,
-    paddingVertical: spacing.hairline + 4,
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  mapToggleText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 13 },
   poolCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.hairline + 4 },
   poolName: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
   poolMeta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
