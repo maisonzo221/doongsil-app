@@ -39,6 +39,12 @@ function toLatLng(xRaw: string, yRaw: string): { lat?: number; lng?: number } {
   }
 }
 
+// 구립/시립 등 공공 수영장은 상태코드가 민간 업체와 다르게 들어있는 경우가 있어서
+// (혹은 비어 있는 경우도 있어서), 서버 쪽에서 SALS_STTS_CD='01'로 미리 걸러버리면
+// 정상 운영 중인 공공 시설이 통째로 빠질 위험이 있다. 그래서 서버 필터는 걸지 않고,
+// 텍스트로 확실히 "폐업/취소/말소"라고 적힌 것만 클라이언트에서 걸러낸다.
+const CLOSED_STATUS_PATTERN = /(폐업|취소|말소)/;
+
 function mapItem(item: any): OfficialPool {
   const { lat, lng } = toLatLng(item.CRD_INFO_X, item.CRD_INFO_Y);
   return {
@@ -53,33 +59,42 @@ function mapItem(item: any): OfficialPool {
   };
 }
 
-async function fetchByCondition(field: 'BPLC_NM' | 'ROAD_NM_ADDR', query: string, maxResults: number) {
+async function fetchByCondition(
+  field: 'BPLC_NM' | 'ROAD_NM_ADDR' | 'LOTNO_ADDR',
+  query: string,
+  maxResults: number
+) {
   const params = new URLSearchParams({
     serviceKey: API_KEY as string,
     pageNo: '1',
     numOfRows: String(maxResults),
     returnType: 'json',
-    'cond[SALS_STTS_CD::EQ]': '01', // 영업/정상 상태만
   });
   params.set(`cond[${field}::LIKE]`, query);
 
   const res = await fetch(`${BASE_URL}?${params.toString()}`);
   const json = await res.json();
   const items = json?.response?.body?.items?.item ?? [];
-  return (Array.isArray(items) ? items : [items]).filter(Boolean).map(mapItem);
+  return (Array.isArray(items) ? items : [items])
+    .filter(Boolean)
+    .map(mapItem)
+    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName));
 }
 
-/** 수영장 이름이나 지역(도로명주소)으로 검색한다. 둘 다 시도해서 합친다. */
-export async function searchOfficialPools(query: string, maxResults = 20): Promise<OfficialPool[]> {
+/** 수영장 이름이나 지역(도로명주소/지번주소)으로 검색한다. 구 단위·동 단위 검색도 되게
+ * 이름/도로명주소/지번주소 세 필드를 모두 훑어서 합친다. */
+export async function searchOfficialPools(query: string, maxResults = 50): Promise<OfficialPool[]> {
   if (!API_KEY || !query.trim()) return [];
 
   try {
-    const [byName, byAddress] = await Promise.all([
-      fetchByCondition('BPLC_NM', query.trim(), maxResults),
-      fetchByCondition('ROAD_NM_ADDR', query.trim(), maxResults),
+    const q = query.trim();
+    const [byName, byRoadAddress, byLotAddress] = await Promise.all([
+      fetchByCondition('BPLC_NM', q, maxResults),
+      fetchByCondition('ROAD_NM_ADDR', q, maxResults),
+      fetchByCondition('LOTNO_ADDR', q, maxResults),
     ]);
     const byId = new Map<string, OfficialPool>();
-    [...byName, ...byAddress].forEach((p) => byId.set(p.id, p));
+    [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
     return Array.from(byId.values());
   } catch {
     return [];
