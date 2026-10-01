@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   Linking,
   Modal,
   ScrollView,
@@ -70,6 +71,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
+  const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
 
   useEffect(() => {
     if (tab !== 'pools') return;
@@ -92,6 +94,10 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
       clearTimeout(timer);
     };
   }, [tab, poolSearch]);
+
+  useEffect(() => {
+    setSelectedPoolId(officialPools.length > 0 ? officialPools[0].id : null);
+  }, [officialPools]);
 
   const reload = useCallback(async () => {
     const [user, postList, poolList] = await Promise.all([getCurrentUser(), getBoardPosts(), getPools()]);
@@ -135,18 +141,20 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   return (
     <ScreenBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>팁방</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>팁방</Text>
 
-        <View style={styles.tabRow}>
-          {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
-              onPress={() => setTab(t)}
-            >
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_LABEL[t]}</Text>
-            </TouchableOpacity>
-          ))}
+          <View style={styles.tabRow}>
+            {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
+                onPress={() => setTab(t)}
+              >
+                <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_LABEL[t]}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {disabled ? (
@@ -176,53 +184,80 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
             ))}
           </ScrollView>
         ) : tab === 'pools' ? (
-          <ScrollView contentContainerStyle={styles.list}>
-            <TextInput
-              style={styles.searchInput}
-              value={poolSearch}
-              onChangeText={setPoolSearch}
-              placeholder="수영장 이름이나 지역(예: 강남구)으로 검색"
-              placeholderTextColor={colors.textMuted}
-            />
-            {!isPoolDataConfigured ? (
-              <Text style={styles.empty}>수영장 검색 기능을 준비하고 있어요. 조금만 기다려주세요!</Text>
-            ) : loadingOfficial ? (
-              <ActivityIndicator color={colors.primary} style={styles.loading} />
-            ) : !poolSearch.trim() ? (
-              <Text style={styles.empty}>수영장 이름이나 지역을 검색해보세요. 행정안전부 공식 데이터예요.</Text>
-            ) : officialPools.length === 0 ? (
-              <Text style={styles.empty}>검색 결과가 없어요.</Text>
+          <View style={styles.mapScreen}>
+            {isPoolDataConfigured && officialPools.length > 0 ? (
+              <PoolMapView pools={officialPools} fill selectedId={selectedPoolId} />
             ) : (
-              <>
-                <PoolMapView pools={officialPools} />
-                {officialPools.map((p) => {
-                  const mapLink = mapLinkFor(p);
+              <View style={styles.mapPlaceholder}>
+                <Text style={styles.empty}>
+                  {!isPoolDataConfigured
+                    ? '수영장 검색 기능을 준비하고 있어요. 조금만 기다려주세요!'
+                    : loadingOfficial
+                    ? ''
+                    : poolSearch.trim()
+                    ? '검색 결과가 없어요.'
+                    : '수영장 이름이나 지역을 검색해보세요. 행정안전부 공식 데이터예요.'}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.floatingSearchWrap}>
+              <View style={styles.floatingSearchBar}>
+                <TextInput
+                  style={styles.floatingSearchInput}
+                  value={poolSearch}
+                  onChangeText={setPoolSearch}
+                  placeholder="수영장 이름이나 지역(예: 강남구)으로 검색"
+                  placeholderTextColor={colors.textMuted}
+                />
+                {loadingOfficial && <ActivityIndicator color={colors.primary} size="small" />}
+              </View>
+            </View>
+
+            {officialPools.length > 0 && (
+              <FlatList
+                horizontal
+                data={officialPools}
+                keyExtractor={(p) => p.id}
+                showsHorizontalScrollIndicator={false}
+                style={styles.bottomCarouselWrap}
+                contentContainerStyle={styles.bottomCarousel}
+                renderItem={({ item }) => {
+                  const mapLink = mapLinkFor(item);
+                  const selected = item.id === selectedPoolId;
                   return (
-                    <View key={p.id} style={styles.poolCard}>
-                      <Text style={styles.poolName}>{p.name}</Text>
-                      <Text style={styles.poolMeta}>{p.roadAddress}</Text>
-                      <Text style={styles.poolStatus}>{p.statusName}</Text>
+                    <TouchableOpacity
+                      style={[styles.poolCardFloating, selected && styles.poolCardFloatingSelected]}
+                      onPress={() => setSelectedPoolId(item.id)}
+                    >
+                      <Text style={styles.poolName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.poolMeta} numberOfLines={1}>
+                        {item.roadAddress}
+                      </Text>
+                      <Text style={styles.poolStatus}>{item.statusName}</Text>
                       <View style={styles.poolActionsRow}>
-                        {p.phone && (
-                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
+                        {item.phone && (
+                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)}>
                             <Text style={styles.poolAction}>전화하기</Text>
                           </TouchableOpacity>
                         )}
                         {mapLink && (
                           <TouchableOpacity onPress={() => Linking.openURL(mapLink)}>
-                            <Text style={styles.poolAction}>지도에서 보기</Text>
+                            <Text style={styles.poolAction}>길찾기</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity onPress={() => Linking.openURL(registrationSearchLinkFor(p))}>
-                          <Text style={styles.poolAction}>수강신청 찾기</Text>
+                        <TouchableOpacity onPress={() => Linking.openURL(registrationSearchLinkFor(item))}>
+                          <Text style={styles.poolAction}>수강신청</Text>
                         </TouchableOpacity>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
-                })}
-              </>
+                }}
+              />
             )}
-          </ScrollView>
+          </View>
         ) : (
           <ScrollView contentContainerStyle={styles.list}>
             <TextInput
@@ -389,7 +424,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  container: { flex: 1 },
+  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text, marginBottom: spacing.sm },
   tabRow: { flexDirection: 'row', gap: spacing.hairline, marginBottom: spacing.sm },
   tabBtn: { flex: 1, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.card, alignItems: 'center' },
@@ -398,7 +434,41 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.white },
   disabledNotice: { padding: spacing.lg, alignItems: 'center' },
   disabledText: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
-  list: { paddingBottom: spacing.xl },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  // 수영장 찾기 탭: 헬로스윔/네이버지도처럼 지도가 화면을 꽉 채우고, 검색창은 지도 위에
+  // 떠 있는 카드로, 결과는 하단에 가로로 넘기는 카드로 보여준다.
+  mapScreen: { flex: 1 },
+  mapPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg },
+  floatingSearchWrap: { position: 'absolute', top: spacing.xs, left: spacing.sm, right: spacing.sm },
+  floatingSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.hairline + 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  floatingSearchInput: { flex: 1, fontFamily: fonts.regular, color: colors.text, fontSize: 14 },
+  bottomCarouselWrap: { position: 'absolute', left: 0, right: 0, bottom: spacing.sm },
+  bottomCarousel: { paddingHorizontal: spacing.sm, gap: spacing.xs },
+  poolCardFloating: {
+    width: 250,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  poolCardFloatingSelected: { borderWidth: 2, borderColor: colors.primary },
   addRow: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
