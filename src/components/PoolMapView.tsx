@@ -12,26 +12,27 @@ interface Props {
   selectedId?: string | null;
 }
 
-// CARTO/Mapbox/구글맵의 깔끔한 타일은 대부분 API 키(+유료 플랜)가 필요하다 —
-// 실제로 CARTO 무료 타일은 이제 키 없이는 막혀 있다(워터마크로 확인됨).
-// OpenFreeMap(openfreemap.org)은 벡터 타일을 키/가입 없이 무기한 무료로 제공하는
-// 서비스라, MapLibre GL로 그리면 네이버지도/T맵처럼 도로·건물이 벡터로 또렷하게
-// 그려지는 지도를 만들 수 있다. 마커도 Leaflet 기본 파란 핀 대신 브랜드 색
-// (emerald) 원형 점으로 그려서 앱 톤에 맞췄다.
+const NAVER_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID;
+// NCP Maps 콘솔의 "Web 서비스 URL"에 등록해 둔 값과 반드시 똑같아야 한다 — 네이버
+// 지도 JS SDK가 이 주소를 보고 허용된 도메인인지 검사한다(실제 존재하는 사이트일
+// 필요는 없고, 등록값과 WebView의 baseUrl만 일치하면 된다).
+const NAVER_BASE_URL = 'https://doongsil.app';
+
+export const isNaverMapConfigured = !!NAVER_CLIENT_ID;
+
+// 네이버지도 JS SDK를 WebView 안에서 그대로 불러와 쓴다 — 헬로스윔(안녕,수영)이 쓰는
+// 것과 동일한 지도라, 도로/건물 스타일이 똑같이 나온다. Client ID는 NCP Maps 콘솔의
+// Application 등록 후 발급받은 값.
 function mapHtml(points: { id: string; name: string; addr: string; lat: number; lng: number }[]): string {
-  const center = points.length ? [points[0].lng, points[0].lat] : [126.978, 37.5665];
+  const center = points.length ? points[0] : { lat: 37.5665, lng: 126.978 };
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_CLIENT_ID}"></script>
 <style>
   html,body,#map{margin:0;padding:0;height:100%;background:${colors.background};}
-  .maplibregl-ctrl-attrib{font-size:9px;}
-  .pin-dot{width:18px;height:18px;border-radius:50%;background:#0EA894;border:2px solid #ffffff;box-shadow:0 1px 3px rgba(0,0,0,0.3);}
-  .pin-dot.selected{width:24px;height:24px;background:#0A3358;box-shadow:0 2px 6px rgba(0,0,0,0.4);}
-  .pin-popup{font-family:-apple-system,sans-serif;}
+  .pin-popup{font-family:-apple-system,sans-serif;padding:4px 2px;}
   .pin-popup b{font-size:14px;color:#0A3358;}
   .pin-popup .addr{font-size:12px;color:#5F7A8C;margin-top:2px;}
   .pin-popup a{color:#0EA894;font-weight:600;text-decoration:none;display:block;margin-top:6px;font-size:13px;}
@@ -42,57 +43,69 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 <script>
   const points = ${JSON.stringify(points)};
   const markersById = {};
-  const dotsById = {};
-  let selectedEl = null;
+  const infoWindowsById = {};
+  let openInfoWindow = null;
 
-  const map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/liberty',
-    center: [${center[0]}, ${center[1]}],
-    zoom: ${points.length > 1 ? 11 : 14}
+  const map = new naver.maps.Map('map', {
+    center: new naver.maps.LatLng(${center.lat}, ${center.lng}),
+    zoom: ${points.length > 1 ? 11 : 15}
   });
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-  const bounds = new maplibregl.LngLatBounds();
+  const bounds = new naver.maps.LatLngBounds();
   points.forEach(function (p) {
-    const el = document.createElement('div');
-    el.className = 'pin-dot';
+    const position = new naver.maps.LatLng(p.lat, p.lng);
+    const marker = new naver.maps.Marker({
+      position: position,
+      map: map,
+      icon: {
+        content: '<div style="width:16px;height:16px;border-radius:50%;background:#0EA894;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
+        anchor: new naver.maps.Point(9, 9)
+      }
+    });
+    const infoWindow = new naver.maps.InfoWindow({
+      content:
+        '<div class="pin-popup"><b>' + p.name + '</b>' +
+        '<div class="addr">' + p.addr + '</div>' +
+        '<a href="#" data-id="' + p.id + '">길찾기 열기</a></div>',
+      borderWidth: 0,
+      backgroundColor: 'transparent'
+    });
+    naver.maps.Event.addListener(marker, 'click', function () {
+      openPopup(p.id);
+    });
+    markersById[p.id] = marker;
+    infoWindowsById[p.id] = infoWindow;
+    bounds.extend(position);
+  });
+  if (points.length > 1) {
+    map.fitBounds(bounds, { top: 80, right: 40, bottom: 160, left: 40 });
+  }
 
-    const popup = new maplibregl.Popup({ offset: 14 }).setHTML(
-      '<div class="pin-popup"><b>' + p.name + '</b>' +
-      '<div class="addr">' + p.addr + '</div>' +
-      '<a href="#" data-id="' + p.id + '">길찾기 열기</a></div>'
-    );
-    popup.on('open', function () {
-      document.querySelectorAll('.pin-popup a[data-id="' + p.id + '"]').forEach(function (a) {
+  function openPopup(id) {
+    const marker = markersById[id];
+    const infoWindow = infoWindowsById[id];
+    if (!marker || !infoWindow) return;
+    if (openInfoWindow) openInfoWindow.close();
+    infoWindow.open(map, marker);
+    openInfoWindow = infoWindow;
+    naver.maps.Event.addListener(infoWindow, 'domready', function () {
+      const links = document.querySelectorAll('.pin-popup a[data-id="' + id + '"]');
+      links.forEach(function (a) {
         a.onclick = function (e) {
           e.preventDefault();
-          window.ReactNativeWebView.postMessage(p.id);
+          window.ReactNativeWebView.postMessage(id);
         };
       });
     });
-
-    const marker = new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).setPopup(popup).addTo(map);
-    markersById[p.id] = marker;
-    dotsById[p.id] = el;
-    bounds.extend([p.lng, p.lat]);
-  });
-  if (points.length > 1) {
-    map.fitBounds(bounds, { padding: 40, maxZoom: 14 });
   }
 
   // RN 쪽에서 injectJavaScript로 호출한다 (하단 카드 탭 -> 지도 이동 + 팝업).
   window.flyToPool = function (id) {
     const marker = markersById[id];
     if (!marker) return;
-    if (selectedEl) selectedEl.classList.remove('selected');
-    const el = dotsById[id];
-    if (el) {
-      el.classList.add('selected');
-      selectedEl = el;
-    }
-    map.flyTo({ center: marker.getLngLat(), zoom: 15 });
-    marker.togglePopup();
+    map.panTo(marker.getPosition());
+    map.setZoom(15);
+    openPopup(id);
   };
 </script>
 </body>
@@ -123,7 +136,7 @@ export default function PoolMapView({ pools, fill, selectedId }: Props) {
     if (link) Linking.openURL(link);
   }
 
-  if (points.length === 0) return null;
+  if (points.length === 0 || !isNaverMapConfigured) return null;
 
   // 웹(Expo Web)에선 react-native-webview가 제대로 안 뜬다 — 실제 iOS 앱에서만 지원.
   if (Platform.OS === 'web') {
@@ -138,7 +151,7 @@ export default function PoolMapView({ pools, fill, selectedId }: Props) {
     <View style={[styles.container, fill ? styles.fill : styles.card]}>
       <WebView
         ref={webviewRef}
-        source={{ html }}
+        source={{ html, baseUrl: NAVER_BASE_URL }}
         style={styles.webview}
         onMessage={handleMessage}
         originWhitelist={['*']}

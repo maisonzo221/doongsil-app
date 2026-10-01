@@ -14,7 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
-import PoolMapView from '../../components/PoolMapView';
+import PoolMapView, { isNaverMapConfigured } from '../../components/PoolMapView';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
@@ -185,12 +185,12 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
           </ScrollView>
         ) : tab === 'pools' ? (
           <View style={styles.mapScreen}>
-            {isPoolDataConfigured && officialPools.length > 0 ? (
+            {isPoolDataConfigured && isNaverMapConfigured && officialPools.length > 0 ? (
               <PoolMapView pools={officialPools} fill selectedId={selectedPoolId} />
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.empty}>
-                  {!isPoolDataConfigured
+                  {!isPoolDataConfigured || !isNaverMapConfigured
                     ? '수영장 검색 기능을 준비하고 있어요. 조금만 기다려주세요!'
                     : loadingOfficial
                     ? ''
