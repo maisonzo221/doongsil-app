@@ -122,7 +122,7 @@ export default function TeachingScreen() {
   }
 
   return (
-    <ScreenBackground>
+    <ScreenBackground gradient={colors.deepSeaGradient}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.pageTitle}>티칭</Text>
 
@@ -155,8 +155,8 @@ export default function TeachingScreen() {
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm, paddingBottom: spacing.xl },
-  pageTitle: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.sm, marginLeft: spacing.hairline },
-  topTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
+  pageTitle: { fontSize: 28, fontFamily: fonts.bold, color: colors.white, marginBottom: spacing.sm, marginLeft: spacing.hairline },
+  topTitle: { fontFamily: fonts.bold, color: colors.white, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
   topGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: spacing.lg },
   topThumb: { width: '48.5%', marginBottom: spacing.xs },
   thumbCard: { backgroundColor: colors.card, borderRadius: radius.sm, overflow: 'hidden' },
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.hairline,
   },
   categorySection: { marginBottom: spacing.md },
-  categoryTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
+  categoryTitle: { fontFamily: fonts.bold, color: colors.white, fontSize: 15, marginBottom: spacing.xs, marginLeft: spacing.hairline },
   categoryList: { gap: spacing.hairline, paddingLeft: spacing.hairline },
   categoryThumb: { width: 230 },
   categoryLoading: { marginVertical: spacing.sm },

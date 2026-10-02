@@ -1,4 +1,4 @@
-// 팁방: 자유게시판 + 수영장 찾기(자유수영) — Supabase 백엔드 연동.
+// 가이드: 자유게시판 + 수영장 찾기(자유수영) — Supabase 백엔드 연동.
 import { supabase } from '../lib/supabase';
 import { getCurrentUser } from './auth';
 

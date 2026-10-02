@@ -8,10 +8,9 @@ export type CalendarStackParamList = {
 };
 
 export type RootTabParamList = {
-  Calendar: undefined;
   Friends: undefined;
-  Groups: undefined;
-  Teaching: undefined;
+  Calendar: undefined;
   TipRoom: undefined;
+  Teaching: undefined;
   Shop: undefined;
 };

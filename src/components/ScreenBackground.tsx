@@ -4,9 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 
-export default function ScreenBackground({ children }: PropsWithChildren) {
+interface Props extends PropsWithChildren {
+  gradient?: readonly [string, string];
+}
+
+export default function ScreenBackground({ children, gradient }: Props) {
   return (
-    <LinearGradient colors={colors.backgroundGradient} style={styles.fill}>
+    <LinearGradient colors={gradient ?? colors.backgroundGradient} style={styles.fill}>
       <SafeAreaView style={styles.fill} edges={['top', 'left', 'right']}>
         {children}
       </SafeAreaView>

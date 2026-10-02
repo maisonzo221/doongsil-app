@@ -1,8 +1,6 @@
-export type FriendsStackParamList = {
-  FriendsHome: undefined;
-};
+export type RoomKind = 'sutok' | 'toktok';
 
-export type GroupsStackParamList = {
-  GroupsHome: { code?: string } | undefined;
-  ChatRoom: { groupId: string; groupName: string; ownerId: string };
+export type FriendsStackParamList = {
+  FriendsHome: { code?: string } | undefined;
+  ChatRoom: { groupId: string; groupName: string; ownerId: string; roomKind: RoomKind };
 };

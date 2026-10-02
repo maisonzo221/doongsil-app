@@ -6,6 +6,8 @@ export const colors = {
 
   background: '#E3F5F1',
   backgroundGradient: ['#E3F5F1', '#D2E8F4'] as const,
+  // 티칭 탭 전용 — 깊은 바닷속 느낌의 어두운 배경.
+  deepSeaGradient: ['#0A3358', '#041A2C'] as const,
   card: '#FFFFFF',
   cardSoft: '#EFFBF8',
 

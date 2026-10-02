@@ -15,7 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../../theme';
-import { GroupsStackParamList } from '../../navigation/socialTypes';
+import { FriendsStackParamList } from '../../navigation/socialTypes';
 import {
   ChatMessage,
   Friend,
@@ -34,10 +34,11 @@ import { getCurrentUser } from '../../storage/auth';
 import { formatDateLabel } from '../../utils/date';
 import { STROKE_LABEL } from '../../types';
 
-type Props = NativeStackScreenProps<GroupsStackParamList, 'ChatRoom'>;
+type Props = NativeStackScreenProps<FriendsStackParamList, 'ChatRoom'>;
 
 export default function ChatRoomScreen({ route, navigation }: Props) {
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName, roomKind } = route.params;
+  const roomLabel = roomKind === 'toktok' ? '톡톡' : '수톡';
   const [ownerId, setOwnerId] = useState(route.params.ownerId);
   const [myId, setMyId] = useState<string | null>(null);
   const [members, setMembers] = useState<Record<string, Friend>>({});
@@ -112,7 +113,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   }
 
   function handleKick(member: Friend) {
-    Alert.alert('강퇴하기', `${member.nicknameKo}님을 이 수톡방에서 강퇴할까요?`, [
+    Alert.alert('강퇴하기', `${member.nicknameKo}님을 이 ${roomLabel}방에서 강퇴할까요?`, [
       { text: '취소', style: 'cancel' },
       {
         text: '강퇴',
@@ -151,7 +152,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       Alert.alert('나갈 수 없어요', '방장은 먼저 다른 멤버에게 방장을 위임한 뒤 나갈 수 있어요.');
       return;
     }
-    Alert.alert('수톡방 나가기', '정말 나가시겠어요?', [
+    Alert.alert(`${roomLabel}방 나가기`, '정말 나가시겠어요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '나가기',
@@ -191,7 +192,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
                   {item.type === 'record_share' && (
                     <View>
                       <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>
-                        🏊 노팅 기록 공유
+                        🏊 수영 기록 공유
                       </Text>
                       <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
                         {item.sharedSummary}
@@ -253,7 +254,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
               )}
             />
             <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
-              <Text style={styles.leaveBtnText}>수톡방 나가기</Text>
+              <Text style={styles.leaveBtnText}>{roomLabel}방 나가기</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalClose} onPress={() => setMemberModal(false)}>
               <Text style={styles.modalCloseText}>닫기</Text>

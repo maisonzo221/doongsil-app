@@ -18,12 +18,15 @@ export interface MatchedContact extends Friend {
   phone: string;
 }
 
+export type RoomKind = 'sutok' | 'toktok';
+
 export interface ChatGroup {
   id: string;
   name: string;
   inviteCode: string;
   createdAt: string;
   ownerId: string;
+  roomKind: RoomKind;
 }
 
 export type ChatMessageType = 'text' | 'photo' | 'record_share';
@@ -125,10 +128,11 @@ export async function addFriendByInviteCode(
 
 // ---- 수톡 ----
 
-export async function getGroups(): Promise<ChatGroup[]> {
+export async function getGroups(kind: RoomKind): Promise<ChatGroup[]> {
   const { data, error } = await supabase
     .from('chat_groups')
-    .select('id, name, invite_code, created_at, owner_id')
+    .select('id, name, invite_code, created_at, owner_id, room_kind')
+    .eq('room_kind', kind)
     .order('created_at', { ascending: false });
   if (error || !data) return [];
   return data.map((g) => ({
@@ -137,7 +141,27 @@ export async function getGroups(): Promise<ChatGroup[]> {
     inviteCode: g.invite_code,
     createdAt: g.created_at,
     ownerId: g.owner_id,
+    roomKind: g.room_kind,
   }));
+}
+
+/** id로 방 하나를 찾는다. RLS상 멤버만 읽을 수 있어서, 참여/생성 직후(이미 멤버가 된
+ * 뒤)에만 쓴다 — 어느 kind인지 몰라도(딥링크로 코드만 들고 들어왔을 때) 조회 가능. */
+export async function getGroupById(id: string): Promise<ChatGroup | null> {
+  const { data, error } = await supabase
+    .from('chat_groups')
+    .select('id, name, invite_code, created_at, owner_id, room_kind')
+    .eq('id', id)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    name: data.name,
+    inviteCode: data.invite_code,
+    createdAt: data.created_at,
+    ownerId: data.owner_id,
+    roomKind: data.room_kind,
+  };
 }
 
 /** 방장이 멤버를 강퇴한다. 강퇴된 사람은 같은 초대 코드로 다시 못 들어온다. */
@@ -164,10 +188,11 @@ export async function leaveGroup(groupId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function createGroup(name: string, memberIds: string[]): Promise<string> {
+export async function createGroup(name: string, memberIds: string[], kind: RoomKind): Promise<string> {
   const { data, error } = await supabase.rpc('create_group_with_creator', {
     group_name: name,
     member_ids: memberIds,
+    kind,
   });
   if (error || !data) throw error ?? new Error('failed to create group');
   return data as string;

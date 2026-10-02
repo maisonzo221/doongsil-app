@@ -40,10 +40,11 @@ type Props = NativeStackScreenProps<TipRoomStackParamList, 'TipRoomHome'>;
 
 type Tab = 'board' | 'pools' | 'freeSwim';
 
-const TAB_LABEL: Record<Tab, string> = {
-  board: '자유게시판',
-  pools: '수영장 찾기',
-  freeSwim: '자유수영',
+// 세 메뉴가 서로 다른 챕터처럼 느껴지게, 탭마다 고유 색/아이콘/한줄 설명을 둔다.
+const TAB_META: Record<Tab, { label: string; emoji: string; desc: string; accent: string }> = {
+  board: { label: '자유게시판', emoji: '💬', desc: '수영 이야기를 자유롭게 나눠요', accent: colors.primary },
+  pools: { label: '수영장 찾기', emoji: '📍', desc: '전국 수영장을 지도에서 찾아요', accent: colors.blueSea },
+  freeSwim: { label: '자유수영', emoji: '🕒', desc: '자유수영 시간표와 요금을 공유해요', accent: colors.ringActivity },
 };
 
 function timeAgo(iso: string): string {
@@ -142,24 +143,33 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     <ScreenBackground>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>팁방</Text>
+          <Text style={styles.title}>가이드</Text>
 
           <View style={styles.tabRow}>
-            {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
-                onPress={() => setTab(t)}
-              >
-                <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{TAB_LABEL[t]}</Text>
-              </TouchableOpacity>
-            ))}
+            {(Object.keys(TAB_META) as Tab[]).map((t) => {
+              const meta = TAB_META[t];
+              const active = tab === t;
+              return (
+                <TouchableOpacity key={t} style={styles.tabBtn} onPress={() => setTab(t)}>
+                  <Text style={[styles.tabEmoji, !active && styles.tabEmojiInactive]}>{meta.emoji}</Text>
+                  <Text style={[styles.tabText, active && { color: meta.accent, fontFamily: fonts.bold }]}>
+                    {meta.label}
+                  </Text>
+                  <View style={[styles.tabUnderline, active && { backgroundColor: meta.accent }]} />
+                </TouchableOpacity>
+              );
+            })}
           </View>
+        </View>
+
+        <View style={[styles.chapterBanner, { backgroundColor: `${TAB_META[tab].accent}1F` }]}>
+          <Text style={styles.chapterEmoji}>{TAB_META[tab].emoji}</Text>
+          <Text style={[styles.chapterDesc, { color: TAB_META[tab].accent }]}>{TAB_META[tab].desc}</Text>
         </View>
 
         {disabled ? (
           <View style={styles.disabledNotice}>
-            <Text style={styles.disabledText}>팁방 기능은 Apple 로그인 계정에서만 사용할 수 있어요.</Text>
+            <Text style={styles.disabledText}>가이드 기능은 Apple 로그인 계정에서만 사용할 수 있어요.</Text>
           </View>
         ) : tab === 'board' ? (
           <ScrollView contentContainerStyle={styles.list}>
@@ -427,11 +437,22 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
   title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text, marginBottom: spacing.sm },
-  tabRow: { flexDirection: 'row', gap: spacing.hairline, marginBottom: spacing.sm },
-  tabBtn: { flex: 1, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.card, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: colors.primary },
+  tabRow: { flexDirection: 'row' },
+  tabBtn: { flex: 1, alignItems: 'center', paddingBottom: spacing.xs },
+  tabEmoji: { fontSize: 18, marginBottom: 2 },
+  tabEmojiInactive: { opacity: 0.4 },
   tabText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 12 },
-  tabTextActive: { color: colors.white },
+  tabUnderline: { height: 3, borderRadius: 2, alignSelf: 'stretch', marginTop: spacing.hairline, backgroundColor: 'transparent' },
+  chapterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  chapterEmoji: { fontSize: 16 },
+  chapterDesc: { fontFamily: fonts.semibold, fontSize: 12 },
   disabledNotice: { padding: spacing.lg, alignItems: 'center' },
   disabledText: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },

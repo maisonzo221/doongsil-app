@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -13,19 +13,11 @@ import TipRoomHomeScreen from '../screens/tiproom/TipRoomHomeScreen';
 import PostDetailScreen from '../screens/tiproom/PostDetailScreen';
 import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
-import GroupsScreen from '../screens/social/GroupsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
-import {
-  CalendarIcon,
-  FriendsIcon,
-  GroupsIcon,
-  ShopIcon,
-  TeachingIcon,
-  TipRoomIcon,
-} from '../components/icons/TabIcons';
-import { colors, fonts } from '../theme';
+import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
+import { colors } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
-import { FriendsStackParamList, GroupsStackParamList } from './socialTypes';
+import { FriendsStackParamList } from './socialTypes';
 import { TipRoomStackParamList } from './tipRoomTypes';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { getCurrentUser, UserProfile } from '../storage/auth';
@@ -33,34 +25,26 @@ import { getCurrentUser, UserProfile } from '../storage/auth';
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
 const FriendsStack = createNativeStackNavigator<FriendsStackParamList>();
-const GroupsStack = createNativeStackNavigator<GroupsStackParamList>();
 const TipRoomStack = createNativeStackNavigator<TipRoomStackParamList>();
 
 const TAB_ICON: Record<keyof RootTabParamList, React.ComponentType<{ color: string; size?: number }>> = {
-  Calendar: CalendarIcon,
   Friends: FriendsIcon,
-  Groups: GroupsIcon,
-  Teaching: TeachingIcon,
+  Calendar: CalendarIcon,
   TipRoom: TipRoomIcon,
+  Teaching: TeachingIcon,
   Shop: ShopIcon,
 };
 
-const TAB_LABEL: Record<keyof RootTabParamList, string> = {
-  Calendar: '캘린더',
-  Friends: '수친',
-  Groups: '수톡',
-  Teaching: '티칭',
-  TipRoom: '팁방',
-  Shop: '샵',
-};
+// 가운데(가이드) 탭은 아이콘만 더 크고 떠 있는 느낌으로 특별 취급한다.
+const CENTER_TAB: keyof RootTabParamList = 'TipRoom';
 
 const linking: LinkingOptions<any> = {
   prefixes: ['doongsil://'],
   config: {
     screens: {
-      Groups: {
+      Friends: {
         screens: {
-          GroupsHome: 'invite/:code',
+          FriendsHome: 'invite/:code',
         },
       },
     },
@@ -94,20 +78,12 @@ function FriendsStackNavigator() {
   return (
     <FriendsStack.Navigator screenOptions={{ headerShown: false }}>
       <FriendsStack.Screen name="FriendsHome" component={FriendsScreen} />
-    </FriendsStack.Navigator>
-  );
-}
-
-function GroupsStackNavigator() {
-  return (
-    <GroupsStack.Navigator screenOptions={{ headerShown: false }}>
-      <GroupsStack.Screen name="GroupsHome" component={GroupsScreen} />
-      <GroupsStack.Screen
+      <FriendsStack.Screen
         name="ChatRoom"
         component={ChatRoomScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
       />
-    </GroupsStack.Navigator>
+    </FriendsStack.Navigator>
   );
 }
 
@@ -129,26 +105,28 @@ function AppTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.disabledText,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
+        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, height: 64 },
         tabBarIcon: ({ color }) => {
           const Icon = TAB_ICON[route.name as keyof RootTabParamList];
-          return <Icon color={color} size={22} />;
+          const isCenter = route.name === CENTER_TAB;
+          if (isCenter) {
+            return (
+              <View style={styles.centerIconWrap}>
+                <Icon color={colors.white} size={28} />
+              </View>
+            );
+          }
+          return <Icon color={color} size={28} />;
         },
-        tabBarLabel: TAB_LABEL[route.name as keyof RootTabParamList],
       })}
     >
+      {FEATURE_FLAGS.friendsAndChat && <Tab.Screen name="Friends" component={FriendsStackNavigator} />}
       <Tab.Screen name="Calendar" component={CalendarStackNavigator} />
-      {FEATURE_FLAGS.friendsAndChat && (
-        <>
-          <Tab.Screen name="Friends" component={FriendsStackNavigator} />
-          <Tab.Screen name="Groups" component={GroupsStackNavigator} />
-        </>
-      )}
-      <Tab.Screen name="Teaching" component={TeachingScreen} />
       <Tab.Screen name="TipRoom" component={TipRoomStackNavigator} />
+      <Tab.Screen name="Teaching" component={TeachingScreen} />
       <Tab.Screen name="Shop" component={ShopScreen} />
     </Tab.Navigator>
   );
@@ -171,3 +149,20 @@ export default function RootNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  centerIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -20,
+    shadowColor: colors.primaryPressed,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+});
