@@ -235,18 +235,55 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 renderItem={({ item }) => {
                   const mapLink = mapLinkFor(item);
                   const selected = item.id === selectedPoolId;
+                  const operHours = [item.operWeekday && `평일 ${item.operWeekday}`, item.operWeekend && `주말 ${item.operWeekend}`]
+                    .filter(Boolean)
+                    .join(' · ');
                   return (
                     <TouchableOpacity
                       style={[styles.poolCardFloating, selected && styles.poolCardFloatingSelected]}
                       onPress={() => setSelectedPoolId(item.id)}
                     >
-                      <Text style={styles.poolName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
+                      <View style={styles.poolHeaderRow}>
+                        <Text style={styles.poolName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.poolStatus}>{item.statusName}</Text>
+                      </View>
                       <Text style={styles.poolMeta} numberOfLines={1}>
                         {item.roadAddress}
                       </Text>
-                      <Text style={styles.poolStatus}>{item.statusName}</Text>
+
+                      {!!operHours && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>운영시간</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{operHours}</Text>
+                        </View>
+                      )}
+                      {!!item.feeText && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>이용료</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.feeText}</Text>
+                        </View>
+                      )}
+                      {!!item.capacity && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>수용인원</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.capacity}명</Text>
+                        </View>
+                      )}
+                      {!!item.amenities && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>부대시설</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.amenities}</Text>
+                        </View>
+                      )}
+                      {!!item.closedDay && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>휴관일</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.closedDay}</Text>
+                        </View>
+                      )}
+
                       <View style={styles.poolActionsRow}>
                         {item.phone && (
                           <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)}>
@@ -261,6 +298,17 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                         <TouchableOpacity onPress={() => Linking.openURL(registrationSearchLinkFor(item))}>
                           <Text style={styles.poolAction}>수강신청</Text>
                         </TouchableOpacity>
+                        {item.homepageUrl && (
+                          <TouchableOpacity
+                            onPress={() =>
+                              Linking.openURL(
+                                item.homepageUrl!.startsWith('http') ? item.homepageUrl! : `https://${item.homepageUrl}`
+                              )
+                            }
+                          >
+                            <Text style={styles.poolAction}>홈페이지</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
@@ -479,7 +527,7 @@ const styles = StyleSheet.create({
   bottomCarouselWrap: { position: 'absolute', left: 0, right: 0, bottom: spacing.sm },
   bottomCarousel: { paddingHorizontal: spacing.sm, gap: spacing.xs },
   poolCardFloating: {
-    width: 250,
+    width: 290,
     backgroundColor: colors.card,
     borderRadius: radius.md,
     padding: spacing.sm,
@@ -490,6 +538,10 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   poolCardFloatingSelected: { borderWidth: 2, borderColor: colors.primary },
+  poolHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.hairline },
+  poolDetailRow: { flexDirection: 'row', marginTop: spacing.hairline, gap: spacing.hairline },
+  poolDetailLabel: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 11, width: 56 },
+  poolDetailValue: { fontFamily: fonts.regular, color: colors.text, fontSize: 11, flex: 1 },
   addRow: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
@@ -518,9 +570,9 @@ const styles = StyleSheet.create({
   },
   loading: { marginTop: spacing.lg },
   poolCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.hairline + 4 },
-  poolName: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
+  poolName: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, flex: 1 },
   poolMeta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  poolStatus: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 11, marginTop: 2 },
+  poolStatus: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 11, marginTop: 2, flexShrink: 0 },
   poolFreeSwim: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12, marginTop: 4 },
   poolActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   poolAction: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 12 },

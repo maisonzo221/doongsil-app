@@ -1,8 +1,10 @@
 // 행정안전부_생활_수영장업 조회서비스 (data.go.kr) 연동.
 // 실제 인허가받은 수영장의 이름/주소/전화번호/영업상태를 정부 공식 데이터로 가져온다.
-// 이 데이터셋엔 자유수영 시간표나 요금 정보는 없다 — 그건 storage/tipRoom.ts의
-// 크라우드소싱 pools 테이블에서 따로 관리한다.
+// 운영시간·이용료 등 세부 정보는 이 API엔 없어서, PUBLIC_POOL_FACILITIES(전국공공시설
+// 개방정보표준데이터에서 걸러낸 공공 수영장 목록)를 같이 검색해서 합친다 — 거기엔
+// 평일/주말 운영시간, 이용료, 수용인원, 부대시설, 휴관일, 홈페이지가 실제로 들어있다.
 import proj4 from 'proj4';
+import { PUBLIC_POOL_FACILITIES } from '../data/publicPoolFacilities';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
 const BASE_URL = 'https://apis.data.go.kr/1741000/swimming_pools/info';
@@ -23,6 +25,18 @@ export interface OfficialPool {
   statusName: string;
   lat?: number;
   lng?: number;
+  // 아래는 PUBLIC_POOL_FACILITIES(공공시설개방정보) 쪽에만 채워진다 — 수영장업
+  // 인허가 API에는 없는 정보라, 민간 등록 수영장은 이 필드들이 비어 있다.
+  operWeekday?: string;
+  operWeekend?: string;
+  closedDay?: string;
+  feeText?: string;
+  capacity?: string;
+  amenities?: string;
+  applyMethod?: string;
+  homepageUrl?: string;
+  photoUrl?: string;
+  source?: 'business' | 'public';
 }
 
 export const isPoolDataConfigured = !!API_KEY;
@@ -56,7 +70,38 @@ function mapItem(item: any): OfficialPool {
     statusName: item.SALS_STTS_NM || '',
     lat,
     lng,
+    source: 'business',
   };
+}
+
+function mapPublicFacility(f: (typeof PUBLIC_POOL_FACILITIES)[number]): OfficialPool {
+  return {
+    id: f.id,
+    name: f.name,
+    roadAddress: f.roadAddress,
+    lotAddress: f.lotAddress,
+    phone: f.phone ?? undefined,
+    statusName: f.statusName,
+    lat: f.lat,
+    lng: f.lng,
+    operWeekday: f.operWeekday ?? undefined,
+    operWeekend: f.operWeekend ?? undefined,
+    closedDay: f.closedDay ?? undefined,
+    feeText: f.feeText ?? undefined,
+    capacity: f.capacity ?? undefined,
+    amenities: f.amenities ?? undefined,
+    applyMethod: f.applyMethod ?? undefined,
+    homepageUrl: f.homepageUrl ?? undefined,
+    photoUrl: f.photoUrl ?? undefined,
+    source: 'public',
+  };
+}
+
+function searchPublicFacilities(tokens: string[]): OfficialPool[] {
+  return PUBLIC_POOL_FACILITIES.filter((f) => {
+    const haystack = `${f.name} ${f.roadAddress} ${f.lotAddress}`;
+    return tokens.every((t) => haystack.includes(t));
+  }).map(mapPublicFacility);
 }
 
 async function fetchByCondition(
@@ -96,10 +141,13 @@ function matchesAllTokens(pool: OfficialPool, tokens: string[]): boolean {
  * 더 확인한다 — "중구"로 넓게 가져온 다음 "서울"도 포함된 것만 남기는 식이라, 대전 중구
  * 같은 동명이인도 자연스럽게 걸러진다. */
 export async function searchOfficialPools(query: string, maxResults = 100): Promise<OfficialPool[]> {
-  if (!API_KEY || !query.trim()) return [];
+  if (!query.trim()) return [];
 
   const tokens = query.trim().split(/\s+/).filter(Boolean);
   const primary = tokens[tokens.length - 1];
+  const publicResults = searchPublicFacilities(tokens);
+
+  if (!API_KEY) return publicResults;
 
   try {
     const [byName, byRoadAddress, byLotAddress] = await Promise.all([
@@ -109,10 +157,11 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
     ]);
     const byId = new Map<string, OfficialPool>();
     [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
-    const all = Array.from(byId.values());
-    return tokens.length > 1 ? all.filter((p) => matchesAllTokens(p, tokens)) : all;
+    const businessResults = Array.from(byId.values());
+    const filtered = tokens.length > 1 ? businessResults.filter((p) => matchesAllTokens(p, tokens)) : businessResults;
+    return [...publicResults, ...filtered];
   } catch {
-    return [];
+    return publicResults;
   }
 }
 
