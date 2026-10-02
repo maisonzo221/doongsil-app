@@ -54,12 +54,19 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
   const bounds = new naver.maps.LatLngBounds();
   points.forEach(function (p) {
     const position = new naver.maps.LatLng(p.lat, p.lng);
+    // 📍 모양(물방울 핀)이랑 통일 — 지도 핀도 같은 실루엣의 SVG 핀으로 그린다.
+    const pinSvg =
+      '<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="M14 0C6.3 0 0 6.5 0 14.5 0 25 14 36 14 36s14-11 14-21.5C28 6.5 21.7 0 14 0z" fill="#0EA894" stroke="#ffffff" stroke-width="2"/>' +
+      '<circle cx="14" cy="14.5" r="5" fill="#ffffff"/>' +
+      '</svg>';
     const marker = new naver.maps.Marker({
       position: position,
       map: map,
       icon: {
-        content: '<div style="width:16px;height:16px;border-radius:50%;background:#0EA894;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>',
-        anchor: new naver.maps.Point(9, 9)
+        content: pinSvg,
+        size: new naver.maps.Size(28, 36),
+        anchor: new naver.maps.Point(14, 36)
       }
     });
     const infoWindow = new naver.maps.InfoWindow({
