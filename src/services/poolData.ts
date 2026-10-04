@@ -45,6 +45,8 @@ export interface OfficialPool {
   freeSwimInfo?: string;
   institution?: string;
   notes?: string;
+  /** 검색어로 직접 매칭된 게 아니라 반경 검색으로 끼어든 주변 수영장이면 true. */
+  nearbyMatch?: boolean;
 }
 
 export const isPoolDataConfigured = !!API_KEY;
@@ -169,6 +171,47 @@ function matchesAllTokens(pool: OfficialPool, tokens: string[]): boolean {
   return tokens.every((t) => haystack.includes(t));
 }
 
+const NEARBY_RADIUS_KM = 3;
+const MAX_NEARBY = 20;
+
+function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** 번들 데이터(서울+전국 공공시설)는 전부 메모리에 있어서, 검색 결과 중 좌표가 있는 첫
+ * 번째 시설을 기준점 삼아 반경 3km 안의 다른 수영장도 같이 보여준다 — "회현"처럼 동네
+ * 이름으로 검색해도 이름에 "회현"이 없는 근처 수영장(봉래체육문화센터 등)까지 나오게.
+ * 수영장업 인허가 API(business)는 지역 반경 조회를 지원하지 않아 이 확장 대상에선 뺀다 —
+ * API에 없는 걸 지어내서 "근처"라고 보여줄 순 없으니까. */
+function findNearbyPools(anchorLat: number, anchorLng: number, excludeIds: Set<string>): OfficialPool[] {
+  const candidates = [
+    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
+    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
+  ];
+  return candidates
+    .filter((p) => p.lat != null && p.lng != null && !excludeIds.has(p.id))
+    .map((p) => ({ pool: p, dist: haversineKm(anchorLat, anchorLng, p.lat as number, p.lng as number) }))
+    .filter((x) => x.dist <= NEARBY_RADIUS_KM)
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, MAX_NEARBY)
+    .map((x) => ({ ...x.pool, nearbyMatch: true }));
+}
+
+/** 검색 결과 중 좌표가 있는 첫 시설을 기준으로 주변 수영장을 이어 붙인다. */
+function withNearby(results: OfficialPool[]): OfficialPool[] {
+  const anchor = results.find((p) => p.lat != null && p.lng != null);
+  if (!anchor) return results;
+  const excludeIds = new Set(results.map((p) => p.id));
+  const nearby = findNearbyPools(anchor.lat as number, anchor.lng as number, excludeIds);
+  return [...results, ...nearby];
+}
+
 /** 수영장 이름이나 지역(도로명주소/지번주소)으로 검색한다. 구 단위·동 단위 검색도 되게
  * 이름/도로명주소/지번주소 세 필드를 모두 훑어서 합친다.
  *
@@ -185,7 +228,7 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   const primary = tokens[tokens.length - 1];
   const publicResults = [...searchSeoulFacilities(tokens), ...searchPublicFacilities(tokens)];
 
-  if (!API_KEY) return publicResults;
+  if (!API_KEY) return withNearby(publicResults);
 
   try {
     const [byName, byRoadAddress, byLotAddress] = await Promise.all([
@@ -197,9 +240,9 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
     [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
     const businessResults = Array.from(byId.values());
     const filtered = tokens.length > 1 ? businessResults.filter((p) => matchesAllTokens(p, tokens)) : businessResults;
-    return [...publicResults, ...filtered];
+    return withNearby([...publicResults, ...filtered]);
   } catch {
-    return publicResults;
+    return withNearby(publicResults);
   }
 }
 

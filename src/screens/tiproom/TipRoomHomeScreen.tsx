@@ -244,9 +244,16 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                       onPress={() => setSelectedPoolId(item.id)}
                     >
                       <View style={styles.poolHeaderRow}>
-                        <Text style={styles.poolName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
+                        <View style={styles.poolNameRow}>
+                          {item.nearbyMatch && (
+                            <View style={styles.nearbyBadge}>
+                              <Text style={styles.nearbyBadgeText}>근처</Text>
+                            </View>
+                          )}
+                          <Text style={styles.poolName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                        </View>
                         <Text style={styles.poolStatus}>{item.statusName}</Text>
                       </View>
                       <Text style={styles.poolMeta} numberOfLines={1}>
@@ -557,6 +564,9 @@ const styles = StyleSheet.create({
   },
   poolCardFloatingSelected: { borderWidth: 2, borderColor: colors.primary },
   poolHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.hairline },
+  poolNameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 },
+  nearbyBadge: { backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },
+  nearbyBadgeText: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 9 },
   poolDetailRow: { flexDirection: 'row', marginTop: spacing.hairline, gap: spacing.hairline },
   poolDetailLabel: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 11, width: 56 },
   poolDetailValue: { fontFamily: fonts.regular, color: colors.text, fontSize: 11, flex: 1 },
