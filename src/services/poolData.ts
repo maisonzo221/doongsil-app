@@ -118,6 +118,8 @@ function mapSeoulFacility(f: (typeof SEOUL_POOL_FACILITIES)[number]): OfficialPo
     name: f.name,
     roadAddress: f.roadAddress,
     lotAddress: f.roadAddress,
+    lat: f.lat ?? undefined,
+    lng: f.lng ?? undefined,
     phone: f.phone ?? undefined,
     statusName: f.statusName,
     operWeekday: f.operWeekday ?? undefined,
