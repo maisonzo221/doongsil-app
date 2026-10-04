@@ -259,6 +259,18 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                           <Text style={styles.poolDetailValue} numberOfLines={1}>{operHours}</Text>
                         </View>
                       )}
+                      {!!item.sizeText && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>규모</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.sizeText}</Text>
+                        </View>
+                      )}
+                      {!!item.freeSwimInfo && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>자유수영</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.freeSwimInfo}</Text>
+                        </View>
+                      )}
                       {!!item.feeText && (
                         <View style={styles.poolDetailRow}>
                           <Text style={styles.poolDetailLabel}>이용료</Text>
@@ -281,6 +293,12 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                         <View style={styles.poolDetailRow}>
                           <Text style={styles.poolDetailLabel}>휴관일</Text>
                           <Text style={styles.poolDetailValue} numberOfLines={1}>{item.closedDay}</Text>
+                        </View>
+                      )}
+                      {!!item.notes && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={styles.poolDetailLabel}>비고</Text>
+                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.notes}</Text>
                         </View>
                       )}
 

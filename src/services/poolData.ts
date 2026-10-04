@@ -1,10 +1,12 @@
 // 행정안전부_생활_수영장업 조회서비스 (data.go.kr) 연동.
 // 실제 인허가받은 수영장의 이름/주소/전화번호/영업상태를 정부 공식 데이터로 가져온다.
 // 운영시간·이용료 등 세부 정보는 이 API엔 없어서, PUBLIC_POOL_FACILITIES(전국공공시설
-// 개방정보표준데이터에서 걸러낸 공공 수영장 목록)를 같이 검색해서 합친다 — 거기엔
-// 평일/주말 운영시간, 이용료, 수용인원, 부대시설, 휴관일, 홈페이지가 실제로 들어있다.
+// 개방정보표준데이터에서 걸러낸 공공 수영장 목록)와 SEOUL_POOL_FACILITIES(서울 열린데이터
+// 광장에서 걸러낸 서울시내 공공 수영장 목록)를 같이 검색해서 합친다 — 평일/주말 운영시간,
+// 이용료, 부대시설, 홈페이지, (서울 쪽은) 레일 수·자유수영 안내까지 실제로 들어있다.
 import proj4 from 'proj4';
 import { PUBLIC_POOL_FACILITIES } from '../data/publicPoolFacilities';
+import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
 const BASE_URL = 'https://apis.data.go.kr/1741000/swimming_pools/info';
@@ -36,7 +38,13 @@ export interface OfficialPool {
   applyMethod?: string;
   homepageUrl?: string;
   photoUrl?: string;
-  source?: 'business' | 'public';
+  source?: 'business' | 'public' | 'seoul';
+  // 아래는 SEOUL_POOL_FACILITIES 쪽에만 채워진다 — 서울 열린데이터광장 데이터엔 좌표가
+  // 없어서 지도 핀으로는 못 뜨지만, 레일 수(자유 텍스트)와 자유수영 안내는 실제로 들어있다.
+  sizeText?: string;
+  freeSwimInfo?: string;
+  institution?: string;
+  notes?: string;
 }
 
 export const isPoolDataConfigured = !!API_KEY;
@@ -104,6 +112,34 @@ function searchPublicFacilities(tokens: string[]): OfficialPool[] {
   }).map(mapPublicFacility);
 }
 
+function mapSeoulFacility(f: (typeof SEOUL_POOL_FACILITIES)[number]): OfficialPool {
+  return {
+    id: f.id,
+    name: f.name,
+    roadAddress: f.roadAddress,
+    lotAddress: f.roadAddress,
+    phone: f.phone ?? undefined,
+    statusName: f.statusName,
+    operWeekday: f.operWeekday ?? undefined,
+    operWeekend: f.operWeekend ?? undefined,
+    feeText: f.feeText ?? undefined,
+    amenities: f.amenities ?? undefined,
+    homepageUrl: f.homepageUrl ?? undefined,
+    sizeText: f.sizeText ?? undefined,
+    freeSwimInfo: f.freeSwimInfo ?? undefined,
+    institution: f.institution ?? undefined,
+    notes: f.notes ?? undefined,
+    source: 'seoul',
+  };
+}
+
+function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
+  return SEOUL_POOL_FACILITIES.filter((f) => {
+    const haystack = `${f.name} ${f.district ?? ''} ${f.roadAddress}`;
+    return tokens.every((t) => haystack.includes(t));
+  }).map(mapSeoulFacility);
+}
+
 async function fetchByCondition(
   field: 'BPLC_NM' | 'ROAD_NM_ADDR' | 'LOTNO_ADDR',
   query: string,
@@ -145,7 +181,7 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
 
   const tokens = query.trim().split(/\s+/).filter(Boolean);
   const primary = tokens[tokens.length - 1];
-  const publicResults = searchPublicFacilities(tokens);
+  const publicResults = [...searchSeoulFacilities(tokens), ...searchPublicFacilities(tokens)];
 
   if (!API_KEY) return publicResults;
 
@@ -165,10 +201,17 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   }
 }
 
-/** 외부 지도 앱(카카오맵)으로 여는 링크. 카카오맵 API 키 없이도 작동한다. */
+/** 외부 지도 앱(카카오맵)으로 여는 링크. 카카오맵 API 키 없이도 작동한다.
+ * 좌표가 없는 시설(서울 열린데이터광장 쪽엔 좌표 필드가 없음)은 좌표 대신 실제 주소로
+ * 검색하는 링크로 대신한다 — 좌표를 지어내지 않고, 있는 그대로의 주소 데이터만 쓴다. */
 export function mapLinkFor(pool: OfficialPool): string | undefined {
-  if (pool.lat == null || pool.lng == null) return undefined;
-  return `https://map.kakao.com/link/map/${encodeURIComponent(pool.name)},${pool.lat},${pool.lng}`;
+  if (pool.lat != null && pool.lng != null) {
+    return `https://map.kakao.com/link/map/${encodeURIComponent(pool.name)},${pool.lat},${pool.lng}`;
+  }
+  if (pool.roadAddress) {
+    return `https://map.kakao.com/link/search/${encodeURIComponent(pool.roadAddress)}`;
+  }
+  return undefined;
 }
 
 // 정부 데이터셋엔 수강신청/자유수영 등록 페이지 링크가 없다. 없는 링크를 지어낼 수 없어서,
