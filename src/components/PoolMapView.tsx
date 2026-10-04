@@ -10,6 +10,8 @@ interface Props {
   fill?: boolean;
   /** 이 id의 수영장으로 지도를 이동시키고 팝업을 띄운다 (하단 카드 탭 연동용). */
   selectedId?: string | null;
+  /** 지도 위 핀을 직접 탭했을 때 호출된다 — 하단 카드 캐러셀을 그 카드로 스크롤/선택시키는 용도. */
+  onSelectPool?: (id: string) => void;
 }
 
 const NAVER_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID;
@@ -32,7 +34,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_CLIENT_ID}"></script>
 <style>
   html,body,#map{margin:0;padding:0;height:100%;background:${colors.background};}
-  .pin-popup{font-family:-apple-system,sans-serif;padding:4px 2px;}
+  .pin-popup{font-family:-apple-system,sans-serif;padding:8px 10px;max-width:220px;}
   .pin-popup b{font-size:14px;color:#0A3358;}
   .pin-popup .addr{font-size:12px;color:#5F7A8C;margin-top:2px;}
   .pin-popup a{color:#0EA894;font-weight:600;text-decoration:none;display:block;margin-top:6px;font-size:13px;}
@@ -74,11 +76,17 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
         '<div class="pin-popup"><b>' + p.name + '</b>' +
         '<div class="addr">' + p.addr + '</div>' +
         '<a href="#" data-id="' + p.id + '">길찾기 열기</a></div>',
-      borderWidth: 0,
-      backgroundColor: 'transparent'
+      borderWidth: 1,
+      borderColor: '#E4ECEA',
+      backgroundColor: '#FFFFFF',
+      anchorSize: new naver.maps.Size(12, 10),
+      pixelOffset: new naver.maps.Point(0, -4)
     });
     naver.maps.Event.addListener(marker, 'click', function () {
       openPopup(p.id);
+      // InfoWindow 위치가 잘못 그려지는 경우가 있어서, 핀을 누르면 하단 카드 캐러셀도
+      // 같이 선택되게 알려준다 — 거기선 항상 정확하게 전체 정보가 뜬다.
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'markerTap', id: p.id }));
     });
     markersById[p.id] = marker;
     infoWindowsById[p.id] = infoWindow;
@@ -100,7 +108,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
       links.forEach(function (a) {
         a.onclick = function (e) {
           e.preventDefault();
-          window.ReactNativeWebView.postMessage(id);
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'openMap', id: id }));
         };
       });
     });
@@ -119,7 +127,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 </html>`;
 }
 
-export default function PoolMapView({ pools, fill, selectedId }: Props) {
+export default function PoolMapView({ pools, fill, selectedId, onSelectPool }: Props) {
   const webviewRef = useRef<WebView>(null);
   const points = useMemo(
     () =>
@@ -138,9 +146,20 @@ export default function PoolMapView({ pools, fill, selectedId }: Props) {
   }, [selectedId]);
 
   function handleMessage(event: WebViewMessageEvent) {
-    const pool = pools.find((p) => p.id === event.nativeEvent.data);
-    const link = pool ? mapLinkFor(pool) : undefined;
-    if (link) Linking.openURL(link);
+    let msg: { type: string; id: string };
+    try {
+      msg = JSON.parse(event.nativeEvent.data);
+    } catch {
+      return;
+    }
+    const pool = pools.find((p) => p.id === msg.id);
+    if (!pool) return;
+    if (msg.type === 'markerTap') {
+      onSelectPool?.(pool.id);
+    } else if (msg.type === 'openMap') {
+      const link = mapLinkFor(pool);
+      if (link) Linking.openURL(link);
+    }
   }
 
   if (points.length === 0 || !isNaverMapConfigured) return null;

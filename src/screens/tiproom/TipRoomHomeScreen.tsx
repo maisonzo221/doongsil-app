@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -73,6 +73,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
+  const poolCarouselRef = useRef<FlatList<OfficialPool>>(null);
 
   useEffect(() => {
     if (tab !== 'pools') return;
@@ -99,6 +100,16 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   useEffect(() => {
     setSelectedPoolId(officialPools.length > 0 ? officialPools[0].id : null);
   }, [officialPools]);
+
+  // 지도 핀을 탭했을 때(onSelectPool) 하단 카드 캐러셀에서도 그 카드가 보이게 스크롤한다.
+  // InfoWindow 위치가 어긋나도, 여기 카드는 항상 정확한 전체 정보를 보여준다.
+  function handleMarkerSelect(id: string) {
+    setSelectedPoolId(id);
+    const index = officialPools.findIndex((p) => p.id === id);
+    if (index >= 0) {
+      poolCarouselRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }
+  }
 
   const reload = useCallback(async () => {
     const [user, postList, poolList] = await Promise.all([getCurrentUser(), getBoardPosts(), getPools()]);
@@ -196,7 +207,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
         ) : tab === 'pools' ? (
           <View style={styles.mapScreen}>
             {isPoolDataConfigured && isNaverMapConfigured && officialPools.length > 0 ? (
-              <PoolMapView pools={officialPools} fill selectedId={selectedPoolId} />
+              <PoolMapView pools={officialPools} fill selectedId={selectedPoolId} onSelectPool={handleMarkerSelect} />
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.empty}>
@@ -226,12 +237,15 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
             {officialPools.length > 0 && (
               <FlatList
+                ref={poolCarouselRef}
                 horizontal
                 data={officialPools}
                 keyExtractor={(p) => p.id}
                 showsHorizontalScrollIndicator={false}
                 style={styles.bottomCarouselWrap}
                 contentContainerStyle={styles.bottomCarousel}
+                getItemLayout={(_, index) => ({ length: 298, offset: 298 * index, index })}
+                onScrollToIndexFailed={() => {}}
                 renderItem={({ item }) => {
                   const mapLink = mapLinkFor(item);
                   const selected = item.id === selectedPoolId;
