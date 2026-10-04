@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import ComingSoonScreen from './ComingSoonScreen';
 import VideoPlayerModal from '../components/VideoPlayerModal';
@@ -63,18 +64,22 @@ function CategoryRow({
   const [videos, setVideos] = useState<YoutubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    searchSwimVideos(query, 6).then((v) => {
-      if (!cancelled) {
-        setVideos(v);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [query]);
+  // 탭에 다시 들어올 때마다 다시 확인한다 — 같은 슬롯(아침6시~저녁6시 등) 안이면
+  // 캐시된 결과가 바로 돌아오고, 슬롯이 바뀌었으면 실제로 새로 검색한다.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      searchSwimVideos(query, 6).then((v) => {
+        if (!cancelled) {
+          setVideos(v);
+          setLoading(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [query])
+  );
 
   if (!loading && videos.length === 0) return null;
 
@@ -104,12 +109,21 @@ export default function TeachingScreen() {
   const [loadingTop, setLoadingTop] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    searchSwimVideos(TOP_QUERY, 4).then((v) => {
-      setTopVideos(v);
-      setLoadingTop(false);
-    });
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      // 최근 14일 내 업로드로 한정 — "오늘의 인기 쇼츠"가 트렌드를 반영하게 한다.
+      searchSwimVideos(TOP_QUERY, 4, 14).then((v) => {
+        if (!cancelled) {
+          setTopVideos(v);
+          setLoadingTop(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
 
   if (!isYoutubeConfigured) {
     return (
