@@ -17,6 +17,7 @@ import { getAllRecords } from '../storage/records';
 import {
   getMonthActivitySummaries,
   getTodayActivitySummary,
+  importHealthHistoryOnce,
   TodayActivitySummary,
 } from '../services/appleHealth';
 import { computeStreak } from '../utils/streak';
@@ -53,7 +54,11 @@ export default function CalendarScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      getAllRecords().then(setRecords);
+      // 건강 데이터 권한을 처음 허용한 경우에만 실제로 뭔가 하고, 그 다음부턴 바로
+      // 빠져나간다 — 과거 수영 기록을 다 가져온 뒤에 기록 목록을 새로고침한다.
+      importHealthHistoryOnce().finally(() => {
+        getAllRecords().then(setRecords);
+      });
       getTodayActivitySummary(todayString()).then((summary) => {
         if (summary) setTodayActivity(summary);
       });

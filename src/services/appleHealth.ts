@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import AsyncStorage from 'expo-sqlite/kv-store';
 import {
   requestAuthorization,
   queryWorkoutSamples,
@@ -10,6 +11,7 @@ import {
 } from '@kingstinct/react-native-healthkit';
 import { Stroke } from '../types';
 import { computePaceSecPer100m, estimateSwolf } from '../utils/pace';
+import { addRecord, getAllRecords } from '../storage/records';
 
 export interface HealthImportResult {
   distanceMeters: number;
@@ -135,6 +137,64 @@ export async function getTodaySwimWorkout(dateString: string): Promise<HealthImp
     strokeCount: strokeCount || undefined,
     strokes: ['freestyle'],
   };
+}
+
+function dateToLocalString(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const HISTORY_IMPORTED_KEY = '@doongsil/health/historyImported';
+
+/** 건강 데이터 권한을 처음 허용했을 때 딱 한 번, 애플 건강에 있는 과거 수영 운동 기록을
+ * 전부 훑어서 아직 둥실에 없는 날짜만 자동으로 기록을 만들어준다. 이미 한 번 돌았으면
+ * (권한을 거부했을 때도) AsyncStorage 플래그를 보고 바로 빠져나가서, 앱을 열 때마다
+ * 다시 스캔하지 않는다. */
+export async function importHealthHistoryOnce(): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  const already = await AsyncStorage.getItem(HISTORY_IMPORTED_KEY);
+  if (already) return;
+
+  try {
+    const available = await isHealthAvailable();
+    if (!available) return;
+    const granted = await requestHealthAuthorization();
+    if (!granted) return;
+
+    const workouts = await queryWorkoutSamples({
+      filter: { workoutActivityType: WorkoutActivityType.swimming },
+      limit: 0,
+      ascending: true,
+    });
+    if (workouts.length === 0) return;
+
+    const dates = Array.from(new Set(workouts.map((w) => dateToLocalString(w.startDate))));
+    const existingDates = new Set((await getAllRecords()).map((r) => r.date));
+
+    for (const dateString of dates) {
+      if (existingDates.has(dateString)) continue;
+      const imported = await getTodaySwimWorkout(dateString);
+      if (!imported) continue;
+      await addRecord({
+        sport: 'swim',
+        date: dateString,
+        mood: 'good',
+        strokes: imported.strokes,
+        distanceMeters: imported.distanceMeters,
+        durationMinutes: imported.durationMinutes,
+        calories: imported.calories,
+        avgHeartRate: imported.avgHeartRate,
+        avgPaceSecPer100m: imported.avgPaceSecPer100m,
+        swolf: imported.swolf,
+        strokeCount: imported.strokeCount,
+        source: 'health',
+      });
+    }
+  } finally {
+    await AsyncStorage.setItem(HISTORY_IMPORTED_KEY, '1');
+  }
 }
 
 async function fetchDayActivity(dateString: string): Promise<TodayActivitySummary> {
