@@ -91,8 +91,16 @@ async function fetchSwimVideos(
       id: item.id,
       title: item.snippet?.title ?? '',
       channelTitle: item.snippet?.channelTitle ?? '',
+      // medium(320x180)은 큰 그리드/세로 썸네일에선 흐릿하게 뜬다 — 실제로 존재하는
+      // 더 고화질 썸네일부터 순서대로 시도하고, maxres/standard가 없는 영상(쇼츠 등은
+      // 흔함)은 한 단계씩 내려가며 구한다.
       thumbnailUrl:
-        item.snippet?.thumbnails?.medium?.url ?? item.snippet?.thumbnails?.default?.url ?? '',
+        item.snippet?.thumbnails?.maxres?.url ??
+        item.snippet?.thumbnails?.standard?.url ??
+        item.snippet?.thumbnails?.high?.url ??
+        item.snippet?.thumbnails?.medium?.url ??
+        item.snippet?.thumbnails?.default?.url ??
+        '',
       viewCount: Number(item.statistics?.viewCount ?? 0),
       publishedAt: item.snippet?.publishedAt ?? '',
     }))

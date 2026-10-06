@@ -41,13 +41,16 @@ export default function ShopScreen() {
               <Text style={styles.newsBrandText}>{article.brand}</Text>
             </View>
             <View style={styles.newsBody}>
-              <Text style={styles.newsTitle}>{article.title}</Text>
+              <View style={styles.newsTitleRow}>
+                <Text style={styles.newsTitle}>{article.title}</Text>
+                <Text style={styles.newsPrice}>{article.price}</Text>
+              </View>
               <Text style={styles.newsSummary}>{article.summary}</Text>
               <View style={styles.newsFooterRow}>
                 <Text style={styles.newsSource}>
-                  {article.source} · {formatNewsDate(article.date)}
+                  {article.source} · {formatNewsDate(article.date)} 확인
                 </Text>
-                <Text style={styles.newsLink}>원문 보기 →</Text>
+                <Text style={styles.newsLink}>구매하러 가기 →</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -106,7 +109,9 @@ const styles = StyleSheet.create({
   },
   newsBrandText: { fontFamily: fonts.bold, color: colors.white, fontSize: 11 },
   newsBody: { padding: spacing.sm },
-  newsTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
+  newsTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.hairline },
+  newsTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, flex: 1 },
+  newsPrice: { fontFamily: fonts.bold, color: colors.primary, fontSize: 14, flexShrink: 0 },
   newsSummary: {
     fontFamily: fonts.regular,
     color: colors.textMuted,

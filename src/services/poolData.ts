@@ -212,6 +212,21 @@ function withNearby(results: OfficialPool[]): OfficialPool[] {
   return [...results, ...nearby];
 }
 
+// 수영장업 인허가 API(business) 쪽은 이름/주소/전화번호/영업상태뿐이라, 운영시간도 요금도
+// 홈페이지도 전혀 없다 — 사용자가 눌러도 전화 말고는 할 게 없어서 불편하기만 하다.
+// 운영시간·요금·홈페이지·규모·자유수영·부대시설 중 하나도 없는 결과는 검색 결과에서 뺀다.
+function hasUsefulInfo(pool: OfficialPool): boolean {
+  return !!(
+    pool.homepageUrl ||
+    pool.feeText ||
+    pool.operWeekday ||
+    pool.operWeekend ||
+    pool.sizeText ||
+    pool.freeSwimInfo ||
+    pool.amenities
+  );
+}
+
 /** 수영장 이름이나 지역(도로명주소/지번주소)으로 검색한다. 구 단위·동 단위 검색도 되게
  * 이름/도로명주소/지번주소 세 필드를 모두 훑어서 합친다.
  *
@@ -228,7 +243,7 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   const primary = tokens[tokens.length - 1];
   const publicResults = [...searchSeoulFacilities(tokens), ...searchPublicFacilities(tokens)];
 
-  if (!API_KEY) return withNearby(publicResults);
+  if (!API_KEY) return withNearby(publicResults).filter(hasUsefulInfo);
 
   try {
     const [byName, byRoadAddress, byLotAddress] = await Promise.all([
@@ -240,10 +255,24 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
     [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
     const businessResults = Array.from(byId.values());
     const filtered = tokens.length > 1 ? businessResults.filter((p) => matchesAllTokens(p, tokens)) : businessResults;
-    return withNearby([...publicResults, ...filtered]);
+    return withNearby([...publicResults, ...filtered]).filter(hasUsefulInfo);
   } catch {
-    return withNearby(publicResults);
+    return withNearby(publicResults).filter(hasUsefulInfo);
   }
+}
+
+/** 자유수영 탭 전용 — 자유수영 시간 안내가 실제로 있는 공공 수영장만 골라서 돌려준다.
+ * 수영장업 인허가 API(business)는 애초에 자유수영 정보가 없으니 대상에서 뺀다. 라이브
+ * API 호출 없이, 이미 메모리에 있는 번들 데이터(서울+전국 공공시설)만 훑으면 된다. */
+export function getFreeSwimPools(query?: string): OfficialPool[] {
+  const tokens = (query ?? '').trim().split(/\s+/).filter(Boolean);
+  const all = [
+    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
+    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
+  ].filter((p) => !!p.freeSwimInfo);
+
+  if (tokens.length === 0) return all;
+  return all.filter((p) => matchesAllTokens(p, tokens));
 }
 
 /** 외부 지도 앱(카카오맵)으로 여는 링크. 카카오맵 API 키 없이도 작동한다.

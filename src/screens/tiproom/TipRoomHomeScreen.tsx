@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,16 +18,13 @@ import PoolMapView, { isNaverMapConfigured } from '../../components/PoolMapView'
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
-  addPool,
   BOARD_CATEGORIES,
   BoardPost,
   createBoardPost,
   getBoardPosts,
-  getPools,
-  Pool,
-  PoolInput,
 } from '../../storage/tipRoom';
 import {
+  getFreeSwimPools,
   isPoolDataConfigured,
   mapLinkFor,
   OfficialPool,
@@ -59,7 +56,6 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('board');
   const [me, setMe] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<BoardPost[]>([]);
-  const [pools, setPools] = useState<Pool[]>([]);
   const [poolSearch, setPoolSearch] = useState('');
 
   const [postModal, setPostModal] = useState(false);
@@ -67,13 +63,15 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [postTitle, setPostTitle] = useState('');
   const [postBody, setPostBody] = useState('');
 
-  const [poolModal, setPoolModal] = useState(false);
-  const [poolDraft, setPoolDraft] = useState<PoolInput>({ name: '' });
-
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   const poolCarouselRef = useRef<FlatList<OfficialPool>>(null);
+
+  const [freeSwimSearch, setFreeSwimSearch] = useState('');
+  const [freeSwimSelectedId, setFreeSwimSelectedId] = useState<string | null>(null);
+  const freeSwimCarouselRef = useRef<FlatList<OfficialPool>>(null);
+  const freeSwimPools = useMemo(() => getFreeSwimPools(freeSwimSearch), [freeSwimSearch]);
 
   useEffect(() => {
     if (tab !== 'pools') return;
@@ -101,6 +99,10 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     setSelectedPoolId(officialPools.length > 0 ? officialPools[0].id : null);
   }, [officialPools]);
 
+  useEffect(() => {
+    setFreeSwimSelectedId(freeSwimPools.length > 0 ? freeSwimPools[0].id : null);
+  }, [freeSwimPools]);
+
   // 지도 핀을 탭했을 때(onSelectPool) 하단 카드 캐러셀에서도 그 카드가 보이게 스크롤한다.
   // InfoWindow 위치가 어긋나도, 여기 카드는 항상 정확한 전체 정보를 보여준다.
   function handleMarkerSelect(id: string) {
@@ -111,11 +113,18 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     }
   }
 
+  function handleFreeSwimMarkerSelect(id: string) {
+    setFreeSwimSelectedId(id);
+    const index = freeSwimPools.findIndex((p) => p.id === id);
+    if (index >= 0) {
+      freeSwimCarouselRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+    }
+  }
+
   const reload = useCallback(async () => {
-    const [user, postList, poolList] = await Promise.all([getCurrentUser(), getBoardPosts(), getPools()]);
+    const [user, postList] = await Promise.all([getCurrentUser(), getBoardPosts()]);
     setMe(user);
     setPosts(postList);
-    setPools(poolList);
   }, []);
 
   useFocusEffect(
@@ -133,22 +142,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     await reload();
   }
 
-  async function handleSubmitPool() {
-    if (!poolDraft.name.trim()) return;
-    await addPool(poolDraft);
-    setPoolModal(false);
-    setPoolDraft({ name: '' });
-    await reload();
-  }
-
   const disabled = !me || me.provider !== 'apple';
-
-  const filteredFreeSwimPools = pools.filter((p) => {
-    if (!p.freeSwimNote) return false;
-    if (!poolSearch.trim()) return true;
-    const q = poolSearch.trim().toLowerCase();
-    return p.name.toLowerCase().includes(q) || (p.region ?? '').toLowerCase().includes(q);
-  });
 
   return (
     <ScreenBackground>
@@ -252,9 +246,14 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                   const operHours = [item.operWeekday && `평일 ${item.operWeekday}`, item.operWeekend && `주말 ${item.operWeekend}`]
                     .filter(Boolean)
                     .join(' · ');
+                  const lines = selected ? 3 : 1;
                   return (
                     <TouchableOpacity
-                      style={[styles.poolCardFloating, selected && styles.poolCardFloatingSelected]}
+                      style={[
+                        styles.poolCardFloating,
+                        selected && styles.poolCardFloatingSelected,
+                        selected && styles.poolCardFloatingEnlarged,
+                      ]}
                       onPress={() => setSelectedPoolId(item.id)}
                     >
                       <View style={styles.poolHeaderRow}>
@@ -264,62 +263,62 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                               <Text style={styles.nearbyBadgeText}>근처</Text>
                             </View>
                           )}
-                          <Text style={styles.poolName} numberOfLines={1}>
+                          <Text style={[styles.poolName, selected && styles.poolNameEnlarged]} numberOfLines={selected ? 2 : 1}>
                             {item.name}
                           </Text>
                         </View>
                         <Text style={styles.poolStatus}>{item.statusName}</Text>
                       </View>
-                      <Text style={styles.poolMeta} numberOfLines={1}>
+                      <Text style={[styles.poolMeta, selected && styles.poolMetaEnlarged]} numberOfLines={selected ? 2 : 1}>
                         {item.roadAddress}
                       </Text>
 
                       {!!operHours && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>운영시간</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{operHours}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>운영시간</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{operHours}</Text>
                         </View>
                       )}
                       {!!item.sizeText && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>규모</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.sizeText}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>규모</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.sizeText}</Text>
                         </View>
                       )}
                       {!!item.freeSwimInfo && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>자유수영</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.freeSwimInfo}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>자유수영</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.freeSwimInfo}</Text>
                         </View>
                       )}
                       {!!item.feeText && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>이용료</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.feeText}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>이용료</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.feeText}</Text>
                         </View>
                       )}
                       {!!item.capacity && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>수용인원</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.capacity}명</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>수용인원</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.capacity}명</Text>
                         </View>
                       )}
                       {!!item.amenities && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>부대시설</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.amenities}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>부대시설</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.amenities}</Text>
                         </View>
                       )}
                       {!!item.closedDay && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>휴관일</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.closedDay}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>휴관일</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.closedDay}</Text>
                         </View>
                       )}
                       {!!item.notes && (
                         <View style={styles.poolDetailRow}>
-                          <Text style={styles.poolDetailLabel}>비고</Text>
-                          <Text style={styles.poolDetailValue} numberOfLines={1}>{item.notes}</Text>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>비고</Text>
+                          <Text style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]} numberOfLines={lines}>{item.notes}</Text>
                         </View>
                       )}
 
@@ -356,44 +355,114 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
             )}
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list}>
-            <TextInput
-              style={styles.searchInput}
-              value={poolSearch}
-              onChangeText={setPoolSearch}
-              placeholder="수영장 이름이나 지역으로 검색"
-              placeholderTextColor={colors.textMuted}
-            />
-            <TouchableOpacity style={styles.addRow} onPress={() => setPoolModal(true)}>
-              <Text style={styles.addRowText}>+ 자유수영 정보 추가하기</Text>
-            </TouchableOpacity>
-            {filteredFreeSwimPools.length === 0 && (
-              <Text style={styles.empty}>
-                아직 자유수영 정보가 등록된 수영장이 없어요. 알고 있는 정보를 추가해보세요.
-              </Text>
-            )}
-            {filteredFreeSwimPools.map((p) => (
-              <View key={p.id} style={styles.poolCard}>
-                <Text style={styles.poolName}>{p.name}</Text>
-                {p.region && <Text style={styles.poolMeta}>{p.region}</Text>}
-                {p.address && <Text style={styles.poolMeta}>{p.address}</Text>}
-                {p.freeSwimNote && <Text style={styles.poolFreeSwim}>{p.freeSwimNote}</Text>}
-                {p.pricingNote && <Text style={styles.poolMeta}>요금: {p.pricingNote}</Text>}
-                <View style={styles.poolActionsRow}>
-                  {p.phone && (
-                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${p.phone}`)}>
-                      <Text style={styles.poolAction}>전화하기</Text>
-                    </TouchableOpacity>
-                  )}
-                  {p.websiteUrl && (
-                    <TouchableOpacity onPress={() => Linking.openURL(p.websiteUrl!)}>
-                      <Text style={styles.poolAction}>홈페이지</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+          <View style={styles.mapScreen}>
+            {isNaverMapConfigured && freeSwimPools.length > 0 ? (
+              <PoolMapView
+                pools={freeSwimPools}
+                fill
+                selectedId={freeSwimSelectedId}
+                onSelectPool={handleFreeSwimMarkerSelect}
+              />
+            ) : (
+              <View style={styles.mapPlaceholder}>
+                <Text style={styles.empty}>
+                  {!isNaverMapConfigured
+                    ? '자유수영 정보를 준비하고 있어요. 조금만 기다려주세요!'
+                    : freeSwimSearch.trim()
+                    ? '검색 결과가 없어요.'
+                    : '자유수영 시간 정보가 있는 수영장이 아직 서울 지역 위주예요.'}
+                </Text>
               </View>
-            ))}
-          </ScrollView>
+            )}
+
+            <View style={styles.floatingSearchWrap}>
+              <View style={styles.floatingSearchBar}>
+                <TextInput
+                  style={styles.floatingSearchInput}
+                  value={freeSwimSearch}
+                  onChangeText={setFreeSwimSearch}
+                  placeholder="수영장 이름이나 지역(예: 강남구)으로 검색"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            </View>
+
+            {freeSwimPools.length > 0 && (
+              <FlatList
+                ref={freeSwimCarouselRef}
+                horizontal
+                data={freeSwimPools}
+                keyExtractor={(p) => p.id}
+                showsHorizontalScrollIndicator={false}
+                style={styles.bottomCarouselWrap}
+                contentContainerStyle={styles.bottomCarousel}
+                getItemLayout={(_, index) => ({ length: 298, offset: 298 * index, index })}
+                onScrollToIndexFailed={() => {}}
+                renderItem={({ item }) => {
+                  const mapLink = mapLinkFor(item);
+                  const selected = item.id === freeSwimSelectedId;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.poolCardFloating,
+                        selected && styles.poolCardFloatingSelected,
+                        selected && styles.poolCardFloatingEnlarged,
+                      ]}
+                      onPress={() => setFreeSwimSelectedId(item.id)}
+                    >
+                      <Text style={[styles.poolName, selected && styles.poolNameEnlarged]} numberOfLines={selected ? 2 : 1}>
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={[styles.poolMeta, selected && styles.poolMetaEnlarged]}
+                        numberOfLines={selected ? 2 : 1}
+                      >
+                        {item.roadAddress}
+                      </Text>
+
+                      <View style={styles.poolDetailRow}>
+                        <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>
+                          자유수영
+                        </Text>
+                        <Text
+                          style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]}
+                          numberOfLines={selected ? 3 : 1}
+                        >
+                          {item.freeSwimInfo}
+                        </Text>
+                      </View>
+                      {!!item.feeText && (
+                        <View style={styles.poolDetailRow}>
+                          <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>
+                            이용료
+                          </Text>
+                          <Text
+                            style={[styles.poolDetailValue, selected && styles.poolDetailValueEnlarged]}
+                            numberOfLines={selected ? 3 : 1}
+                          >
+                            {item.feeText}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.poolActionsRow}>
+                        {item.phone && (
+                          <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)}>
+                            <Text style={styles.poolAction}>전화하기</Text>
+                          </TouchableOpacity>
+                        )}
+                        {mapLink && (
+                          <TouchableOpacity onPress={() => Linking.openURL(mapLink)}>
+                            <Text style={styles.poolAction}>길찾기</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
+          </View>
         )}
       </View>
 
@@ -439,77 +508,6 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.modalConfirm} onPress={handleSubmitPost}>
                   <Text style={styles.modalConfirmText}>올리기</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 수영장 추가 모달 */}
-      <Modal visible={poolModal} transparent animationType="fade">
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.modalCardTall]}>
-            <ScrollView>
-              <Text style={styles.modalTitle}>자유수영 정보 추가</Text>
-              <TextInput
-                style={styles.input}
-                value={poolDraft.name}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, name: v }))}
-                placeholder="수영장 이름 *"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={styles.input}
-                value={poolDraft.region ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, region: v }))}
-                placeholder="지역 (예: 서울 강남구)"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={styles.input}
-                value={poolDraft.address ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, address: v }))}
-                placeholder="주소"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={styles.input}
-                value={poolDraft.phone ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, phone: v }))}
-                placeholder="전화번호"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="phone-pad"
-              />
-              <TextInput
-                style={styles.input}
-                value={poolDraft.websiteUrl ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, websiteUrl: v }))}
-                placeholder="홈페이지 URL"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.input}
-                value={poolDraft.pricingNote ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, pricingNote: v }))}
-                placeholder="등록 시기 · 구민/타구민 요금"
-                placeholderTextColor={colors.textMuted}
-              />
-              <TextInput
-                style={[styles.input, styles.textarea]}
-                value={poolDraft.freeSwimNote ?? ''}
-                onChangeText={(v) => setPoolDraft((d) => ({ ...d, freeSwimNote: v }))}
-                placeholder="자유수영 시간대"
-                placeholderTextColor={colors.textMuted}
-                multiline
-              />
-              <View style={styles.modalRow}>
-                <TouchableOpacity style={styles.modalCancel} onPress={() => setPoolModal(false)}>
-                  <Text style={styles.modalCancelText}>취소</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalConfirm} onPress={handleSubmitPool}>
-                  <Text style={styles.modalConfirmText}>추가하기</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -577,6 +575,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   poolCardFloatingSelected: { borderWidth: 2, borderColor: colors.primary },
+  // 핀이나 카드를 탭해서 선택되면, 카드가 살짝 커지고 글씨도 커져서 정보가 잘 보이게 한다.
+  poolCardFloatingEnlarged: { width: 320, padding: spacing.sm + 4 },
+  poolNameEnlarged: { fontSize: 18 },
+  poolMetaEnlarged: { fontSize: 13 },
+  poolDetailLabelEnlarged: { fontSize: 13, width: 66 },
+  poolDetailValueEnlarged: { fontSize: 13, lineHeight: 18 },
   poolHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.hairline },
   poolNameRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 4 },
   nearbyBadge: { backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingHorizontal: 6, paddingVertical: 1 },

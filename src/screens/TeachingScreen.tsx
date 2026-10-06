@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,9 +13,18 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import ScreenBackground from '../components/ScreenBackground';
 import ComingSoonScreen from './ComingSoonScreen';
-import VideoPlayerModal from '../components/VideoPlayerModal';
 import { colors, fonts, radius, spacing } from '../theme';
-import { formatViewCount, isYoutubeConfigured, searchSwimVideos, YoutubeVideo } from '../services/youtube';
+import {
+  formatViewCount,
+  isYoutubeConfigured,
+  searchSwimVideos,
+  youtubeWatchUrl,
+  YoutubeVideo,
+} from '../services/youtube';
+
+function openInYoutube(id: string) {
+  Linking.openURL(youtubeWatchUrl(id));
+}
 
 const TOP_QUERY = '수영 팁 shorts';
 
@@ -52,15 +62,7 @@ function VideoThumb({
   );
 }
 
-function CategoryRow({
-  title,
-  query,
-  onSelectVideo,
-}: {
-  title: string;
-  query: string;
-  onSelectVideo: (id: string) => void;
-}) {
+function CategoryRow({ title, query }: { title: string; query: string }) {
   const [videos, setVideos] = useState<YoutubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +98,7 @@ function CategoryRow({
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => (
-            <VideoThumb video={item} style={styles.categoryThumb} onPress={() => onSelectVideo(item.id)} />
+            <VideoThumb video={item} style={styles.categoryThumb} onPress={() => openInYoutube(item.id)} />
           )}
         />
       )}
@@ -107,7 +109,6 @@ function CategoryRow({
 export default function TeachingScreen() {
   const [topVideos, setTopVideos] = useState<YoutubeVideo[]>([]);
   const [loadingTop, setLoadingTop] = useState(true);
-  const [playingId, setPlayingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -151,18 +152,16 @@ export default function TeachingScreen() {
                 video={v}
                 style={styles.topThumb}
                 vertical
-                onPress={() => setPlayingId(v.id)}
+                onPress={() => openInYoutube(v.id)}
               />
             ))}
           </View>
         )}
 
         {CATEGORIES.map((c) => (
-          <CategoryRow key={c.title} title={c.title} query={c.query} onSelectVideo={setPlayingId} />
+          <CategoryRow key={c.title} title={c.title} query={c.query} />
         ))}
       </ScrollView>
-
-      <VideoPlayerModal videoId={playingId} onClose={() => setPlayingId(null)} />
     </ScreenBackground>
   );
 }
