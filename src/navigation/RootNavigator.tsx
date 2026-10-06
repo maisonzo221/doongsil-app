@@ -14,13 +14,14 @@ import PostDetailScreen from '../screens/tiproom/PostDetailScreen';
 import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
+import SettingsScreen from '../screens/social/SettingsScreen';
 import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
 import { colors } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList } from './socialTypes';
 import { TipRoomStackParamList } from './tipRoomTypes';
 import { FEATURE_FLAGS } from '../config/featureFlags';
-import { getCurrentUser, UserProfile } from '../storage/auth';
+import { getCurrentUser, onAuthChange, UserProfile } from '../storage/auth';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
@@ -83,6 +84,11 @@ function FriendsStackNavigator() {
         component={ChatRoomScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
       />
+      <FriendsStack.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
     </FriendsStack.Navigator>
   );
 }
@@ -137,6 +143,11 @@ export default function RootNavigator() {
 
   useEffect(() => {
     getCurrentUser().then(setUser);
+    // 설정 화면의 로그아웃/계정 삭제가 여기까지 직접 닿지 않으니, 상태가 바뀌었다는
+    // 알림을 받으면 로그인 여부를 다시 확인해서 AuthScreen으로 돌아가게 한다.
+    return onAuthChange(() => {
+      getCurrentUser().then(setUser);
+    });
   }, []);
 
   if (user === 'loading') {

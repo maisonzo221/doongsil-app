@@ -5,6 +5,22 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const GUEST_KEY = '@doongsil/auth/guest';
 
+// 로그아웃/계정 삭제는 FriendsStack 안쪽의 SettingsScreen에서 일어나는데, 로그인 여부는
+// RootNavigator가 들고 있는 state라 거기까지 직접 닿지 않는다. 프롭 드릴링 대신 가벼운
+// 구독 목록으로 "로그인 상태가 바뀌었다"만 알려주면, RootNavigator가 getCurrentUser()를
+// 다시 불러서 스스로 갱신한다.
+type AuthChangeListener = () => void;
+const authChangeListeners = new Set<AuthChangeListener>();
+
+export function onAuthChange(listener: AuthChangeListener): () => void {
+  authChangeListeners.add(listener);
+  return () => authChangeListeners.delete(listener);
+}
+
+function notifyAuthChange() {
+  authChangeListeners.forEach((l) => l());
+}
+
 export interface UserProfile {
   id: string;
   nicknameKo: string;
@@ -178,4 +194,19 @@ export async function signOut(): Promise<void> {
   if (isSupabaseConfigured) {
     await supabase.auth.signOut();
   }
+  notifyAuthChange();
+}
+
+/**
+ * 계정(Apple 로그인)과 서버에 있는 데이터(프로필, 수친, 수톡/톡톡 채팅방·메시지,
+ * 자유게시판 글/댓글)를 전부 지운다. delete_own_account() RPC가 auth.users 행을
+ * 지우면 profiles.id가 그걸 on delete cascade로 참조하고 있어서, 거기 달린 모든
+ * 테이블이 한 번에 같이 지워진다(migration_006_delete_account.sql 참고). 기기에만
+ * 있는 수영 기록(캘린더)은 서버에 올라간 적이 없어서 앱 삭제로만 지워진다.
+ */
+export async function deleteAccount(): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  const { error } = await supabase.rpc('delete_own_account');
+  if (error) throw error;
+  await signOut();
 }

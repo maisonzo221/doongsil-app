@@ -199,7 +199,12 @@ export default function FriendsScreen({ navigation, route }: Props) {
   return (
     <ScreenBackground>
       <View style={styles.container}>
-        <Text style={styles.title}>수친</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>수친</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={8}>
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.tabRow}>
           {(Object.keys(SUB_TAB_LABEL) as SubTab[]).map((t) => (
@@ -423,7 +428,9 @@ export default function FriendsScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text, marginBottom: spacing.sm },
+  title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  settingsIcon: { fontSize: 22 },
   tabRow: { flexDirection: 'row', gap: spacing.hairline, marginBottom: spacing.sm },
   tabBtn: { flex: 1, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.card, alignItems: 'center' },
   tabBtnActive: { backgroundColor: colors.primary },
