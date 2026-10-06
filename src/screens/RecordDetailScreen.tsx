@@ -115,52 +115,64 @@ export default function RecordDetailScreen({ route, navigation }: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>기록</Text>
           <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              keyboardType="numeric"
-              placeholder="거리(m)"
-              placeholderTextColor={colors.textMuted}
-              value={distance}
-              onChangeText={(v) => {
-                setDistance(v);
-                setSource('manual');
-              }}
-            />
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              keyboardType="numeric"
-              placeholder="시간(분)"
-              placeholderTextColor={colors.textMuted}
-              value={duration}
-              onChangeText={(v) => {
-                setDuration(v);
-                setSource('manual');
-              }}
-            />
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>거리(m)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="거리(m)"
+                placeholderTextColor={colors.textMuted}
+                value={distance}
+                onChangeText={(v) => {
+                  setDistance(v);
+                  setSource('manual');
+                }}
+              />
+            </View>
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>시간(분)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="시간(분)"
+                placeholderTextColor={colors.textMuted}
+                value={duration}
+                onChangeText={(v) => {
+                  setDuration(v);
+                  setSource('manual');
+                }}
+              />
+            </View>
           </View>
           <View style={[styles.row, styles.rowSpacingTop]}>
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              keyboardType="numeric"
-              placeholder="칼로리(kcal)"
-              placeholderTextColor={colors.textMuted}
-              value={calories}
-              onChangeText={(v) => {
-                setCalories(v);
-                setSource('manual');
-              }}
-            />
-            <TextInput
-              style={[styles.input, styles.halfInput]}
-              keyboardType="numeric"
-              placeholder="평균 심박수(bpm)"
-              placeholderTextColor={colors.textMuted}
-              value={avgHeartRate}
-              onChangeText={(v) => {
-                setAvgHeartRate(v);
-                setSource('manual');
-              }}
-            />
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>칼로리(kcal)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="칼로리(kcal)"
+                placeholderTextColor={colors.textMuted}
+                value={calories}
+                onChangeText={(v) => {
+                  setCalories(v);
+                  setSource('manual');
+                }}
+              />
+            </View>
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>평균 심박수(bpm)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="numeric"
+                placeholder="평균 심박수(bpm)"
+                placeholderTextColor={colors.textMuted}
+                value={avgHeartRate}
+                onChangeText={(v) => {
+                  setAvgHeartRate(v);
+                  setSource('manual');
+                }}
+              />
+            </View>
           </View>
           {(computePaceSecPer100m(distance ? Number(distance) : undefined, duration ? Number(duration) : undefined) ||
             swolf != null) && (
@@ -230,6 +242,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.xs },
   rowSpacingTop: { marginTop: spacing.xs },
   halfInput: { flex: 1 },
+  inputLabel: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 3 },
   derivedRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   derivedText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   input: {

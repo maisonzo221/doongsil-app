@@ -221,7 +221,11 @@ export default function CalendarScreen({ navigation }: Props) {
           <View style={styles.recentSection}>
             <Text style={styles.recentTitle}>최근 기록</Text>
             {recentRecords.map((r) => (
-              <RecordCard key={r.id} record={r} />
+              <RecordCard
+                key={r.id}
+                record={r}
+                onPress={() => navigation.navigate('RecordDetail', { id: r.id })}
+              />
             ))}
           </View>
         )}

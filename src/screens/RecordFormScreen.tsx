@@ -244,6 +244,7 @@ export default function RecordFormScreen({ navigation }: Props) {
             </View>
             <View style={styles.row}>
               <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>거리(m)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -257,6 +258,7 @@ export default function RecordFormScreen({ navigation }: Props) {
                 />
               </View>
               <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>시간(분)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -272,6 +274,7 @@ export default function RecordFormScreen({ navigation }: Props) {
             </View>
             <View style={[styles.row, styles.rowSpacingTop]}>
               <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>칼로리(kcal)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -285,6 +288,7 @@ export default function RecordFormScreen({ navigation }: Props) {
                 />
               </View>
               <View style={styles.halfInput}>
+                <Text style={styles.inputLabel}>평균 심박수(bpm)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -397,6 +401,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.xs },
   rowSpacingTop: { marginTop: spacing.xs },
   halfInput: { flex: 1 },
+  inputLabel: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 3 },
   input: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

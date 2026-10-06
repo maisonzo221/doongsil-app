@@ -1,8 +1,13 @@
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import ScreenBackground from '../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../theme';
 import { SHOP_NEWS } from '../data/shopNews';
+
+function formatNewsDate(dateString: string): string {
+  const [y, m, d] = dateString.split('-');
+  return `${y}.${m}.${d}`;
+}
 
 const COMING_SOON_ITEMS = [
   { emoji: '\u{1F3CA}', label: '둥실 물안경' },
@@ -29,18 +34,21 @@ export default function ShopScreen() {
             key={article.id}
             style={styles.newsCard}
             onPress={() => Linking.openURL(article.link)}
+            activeOpacity={0.9}
           >
-            <View style={styles.newsHeaderRow}>
-              <Text style={styles.newsEmoji}>{article.emoji}</Text>
-              <View style={styles.newsBrandBadge}>
-                <Text style={styles.newsBrandText}>{article.brand}</Text>
-              </View>
+            <Image source={{ uri: article.imageUrl }} style={styles.newsImage} resizeMode="cover" />
+            <View style={styles.newsBrandBadge}>
+              <Text style={styles.newsBrandText}>{article.brand}</Text>
             </View>
-            <Text style={styles.newsTitle}>{article.title}</Text>
-            <Text style={styles.newsSummary}>{article.summary}</Text>
-            <View style={styles.newsFooterRow}>
-              <Text style={styles.newsSource}>{article.source}</Text>
-              <Text style={styles.newsLink}>구매하러 가기 →</Text>
+            <View style={styles.newsBody}>
+              <Text style={styles.newsTitle}>{article.title}</Text>
+              <Text style={styles.newsSummary}>{article.summary}</Text>
+              <View style={styles.newsFooterRow}>
+                <Text style={styles.newsSource}>
+                  {article.source} · {formatNewsDate(article.date)}
+                </Text>
+                <Text style={styles.newsLink}>원문 보기 →</Text>
+              </View>
             </View>
           </TouchableOpacity>
         ))}
@@ -78,19 +86,27 @@ const styles = StyleSheet.create({
   newsCard: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
-    padding: spacing.sm,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  newsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
-  newsEmoji: { fontSize: 20 },
+  newsImage: { width: '100%', aspectRatio: 16 / 9, backgroundColor: colors.cardSoft },
   newsBrandBadge: {
-    backgroundColor: colors.cardSoft,
+    position: 'absolute',
+    top: spacing.xs,
+    left: spacing.xs,
+    backgroundColor: 'rgba(10,51,88,0.65)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.hairline + 2,
     paddingVertical: 2,
   },
-  newsBrandText: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 11 },
-  newsTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginTop: spacing.xs },
+  newsBrandText: { fontFamily: fonts.bold, color: colors.white, fontSize: 11 },
+  newsBody: { padding: spacing.sm },
+  newsTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15 },
   newsSummary: {
     fontFamily: fonts.regular,
     color: colors.textMuted,
