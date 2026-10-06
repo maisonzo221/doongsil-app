@@ -15,7 +15,7 @@
     "android": {
       "package": "app.doongsil",
       "adaptiveIcon": {
-        "backgroundColor": "#8FE3D8",
+        "backgroundColor": "#0A3358",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
