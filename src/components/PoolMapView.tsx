@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { colors, fonts, radius, spacing } from '../theme';
@@ -126,6 +126,11 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
     map.setZoom(15);
     openPopup(id);
   };
+
+  // 지도/핀이 다 준비된 뒤에 RN에 알려준다 — 그 전에 flyToPool을 호출하면 아무 일도
+  // 안 일어나는데(함수는 있어도 마커가 아직 안 올라와 있을 수 있음), RN 쪽에서 이 신호를
+  // 받을 때까지 기다렸다가 선택 이동을 보내게 하기 위함.
+  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapReady' }));
 </script>
 </body>
 </html>`;
@@ -133,6 +138,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 
 export default function PoolMapView({ pools, fill, selectedId, selectToken, onSelectPool }: Props) {
   const webviewRef = useRef<WebView>(null);
+  const [mapReady, setMapReady] = useState(false);
   const points = useMemo(
     () =>
       pools
@@ -142,21 +148,34 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
   );
   const html = useMemo(() => mapHtml(points), [points]);
 
+  // html이 바뀌면(검색 결과가 바뀌어 지도가 통째로 다시 로드되면) WebView 안의 지도도
+  // 처음부터 다시 만들어지므로, 새로 "mapReady" 신호가 올 때까지 다시 기다려야 한다.
   useEffect(() => {
-    if (!selectedId) return;
+    setMapReady(false);
+  }, [html]);
+
+  useEffect(() => {
+    // 지도/마커가 아직 준비되기 전에 flyToPool을 호출하면 조용히 아무 일도 안 일어난다
+    // (특히 처음 지도가 뜰 때 바로 카드를 누르는 경우) — mapReady가 될 때까지 기다렸다가
+    // 보낸다. mapReady가 그 사이에 true로 바뀌면 이 effect가 다시 돌면서 바로 전송된다.
+    if (!selectedId || !mapReady) return;
     webviewRef.current?.injectJavaScript(
       `window.flyToPool && window.flyToPool(${JSON.stringify(selectedId)}); true;`
     );
     // selectToken은 일부러 의존성에 넣는다 — 이미 선택돼 있던 카드를 다시 눌러서
     // selectedId 값 자체는 안 바뀌어도, 지도가 다시 그쪽으로 이동해야 하기 때문.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, selectToken]);
+  }, [selectedId, selectToken, mapReady]);
 
   function handleMessage(event: WebViewMessageEvent) {
-    let msg: { type: string; id: string };
+    let msg: { type: string; id?: string };
     try {
       msg = JSON.parse(event.nativeEvent.data);
     } catch {
+      return;
+    }
+    if (msg.type === 'mapReady') {
+      setMapReady(true);
       return;
     }
     const pool = pools.find((p) => p.id === msg.id);

@@ -24,6 +24,7 @@ import {
   getBoardPosts,
 } from '../../storage/tipRoom';
 import {
+  getDefaultOfficialPools,
   getFreeSwimPools,
   isPoolDataConfigured,
   mapLinkFor,
@@ -80,7 +81,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   useEffect(() => {
     if (tab !== 'pools') return;
     if (!poolSearch.trim()) {
-      setOfficialPools([]);
+      // 검색 전에도 지도가 켜져있어야 하므로, 기본 수영장 목록으로 미리 채워둔다.
+      setOfficialPools(getDefaultOfficialPools());
       return;
     }
     let cancelled = false;

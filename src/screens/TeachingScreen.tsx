@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,7 +52,16 @@ function VideoThumb({
   onBroken: (id: string) => void;
 }) {
   const [candidateIndex, setCandidateIndex] = useState(0);
-  const uri = video.thumbnailCandidates[candidateIndex];
+  // 캐시에 남아있던 옛 버전 데이터 등으로 후보 목록이 비어있을 수도 있으니 방어적으로 처리.
+  const candidates = video.thumbnailCandidates ?? [];
+
+  useEffect(() => {
+    if (candidates.length === 0) onBroken(video.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (candidates.length === 0) return null;
+  const uri = candidates[candidateIndex];
 
   return (
     <TouchableOpacity style={[styles.thumbCard, style]} onPress={onPress}>
@@ -62,7 +71,7 @@ function VideoThumb({
         onError={() => {
           // 이 화질 썸네일이 깨져 있으면 한 단계 낮은 후보로 넘어가고, 다 깨졌으면
           // 목록에서 이 영상을 숨긴다 — 깨진 이미지 칸이 그대로 보이지 않게.
-          if (candidateIndex < video.thumbnailCandidates.length - 1) {
+          if (candidateIndex < candidates.length - 1) {
             setCandidateIndex((i) => i + 1);
           } else {
             onBroken(video.id);

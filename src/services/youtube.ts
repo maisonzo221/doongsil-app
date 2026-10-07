@@ -9,7 +9,10 @@
 import AsyncStorage from 'expo-sqlite/kv-store';
 
 const API_KEY = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY;
-const CACHE_PREFIX = '@doongsil/youtube/';
+// v2: YoutubeVideo에 thumbnailCandidates가 추가되면서 모양이 바뀌었다. 이전 버전이 저장해둔
+// v1 캐시를 그대로 읽으면 thumbnailCandidates가 없는 옛날 객체가 돌아와서 화면에서 터진다 —
+// 그래서 캐시 키 자체를 새 prefix로 바꿔 옛 캐시를 전부 무시하고 새로 받아오게 한다.
+const CACHE_PREFIX = '@doongsil/youtube/v2/';
 
 export interface YoutubeVideo {
   id: string;
@@ -52,7 +55,13 @@ interface CachedEntry {
 async function readCache(cacheKey: string): Promise<CachedEntry | null> {
   try {
     const raw = await AsyncStorage.getItem(cacheKey);
-    return raw ? (JSON.parse(raw) as CachedEntry) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedEntry;
+    // 모양이 안 맞는 캐시(옛 버전 등)는 쓰지 않고 그냥 새로 받아오게 한다.
+    if (!Array.isArray(parsed.videos) || parsed.videos.some((v) => !Array.isArray(v.thumbnailCandidates))) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }

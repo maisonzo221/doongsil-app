@@ -261,6 +261,19 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   }
 }
 
+/** 수영장 찾기 탭에 처음 들어왔을 때(아직 검색 전) 지도를 바로 보여주기 위한 기본 목록.
+ * 라이브 API 호출 없이, 이미 메모리에 있는 번들 데이터 중 쓸만한 정보가 있는 곳만 추려서
+ * 돌려준다 — 검색창에 뭔가 입력하기 전에도 지도가 비어있지 않게. */
+export function getDefaultOfficialPools(limit = 30): OfficialPool[] {
+  return [
+    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
+    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
+  ]
+    .filter(hasUsefulInfo)
+    .filter((p) => p.lat != null && p.lng != null)
+    .slice(0, limit);
+}
+
 /** 자유수영 탭 전용 — 자유수영 시간 안내가 실제로 있는 공공 수영장만 골라서 돌려준다.
  * 수영장업 인허가 API(business)는 애초에 자유수영 정보가 없으니 대상에서 뺀다. 라이브
  * API 호출 없이, 이미 메모리에 있는 번들 데이터(서울+전국 공공시설)만 훑으면 된다. */
