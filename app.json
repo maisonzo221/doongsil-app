@@ -2,6 +2,7 @@
   "expo": {
     "name": "둥실 - 수영의 거의 모든 것",
     "slug": "doongsil-app",
+    "owner": "retruths-team",
     "version": "1.0.0",
     "scheme": "doongsil",
     "orientation": "portrait",
@@ -49,6 +50,11 @@
           "NSHealthUpdateUsageDescription": "둥실은 건강 데이터를 읽기만 하고 쓰지는 않아요. 이 항목은 애플 건강 연동 기능에 포함되어 있지만 실제로 사용하지 않습니다."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "094c630d-f776-48c2-9aaa-bfce2ea93f3c"
+      }
+    }
   }
 }
