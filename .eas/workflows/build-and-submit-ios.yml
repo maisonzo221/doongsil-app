@@ -1,3 +1,5 @@
+# main에 push될 때마다 자동으로 iOS 프로덕션 빌드 + TestFlight 제출.
+# 2026-10-07에 연결 테스트.
 name: iOS build and submit
 
 on:
