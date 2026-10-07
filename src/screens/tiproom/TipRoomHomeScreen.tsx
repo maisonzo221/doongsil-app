@@ -66,10 +66,14 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
+  // 이미 선택된 카드를 또 눌러도(특히 첫 번째 카드는 처음부터 선택돼 있어서 id가 안 바뀜)
+  // 지도가 다시 그쪽으로 이동하도록, 탭할 때마다 값을 바꿔서 PoolMapView에 넘긴다.
+  const [poolSelectToken, setPoolSelectToken] = useState(0);
   const poolCarouselRef = useRef<FlatList<OfficialPool>>(null);
 
   const [freeSwimSearch, setFreeSwimSearch] = useState('');
   const [freeSwimSelectedId, setFreeSwimSelectedId] = useState<string | null>(null);
+  const [freeSwimSelectToken, setFreeSwimSelectToken] = useState(0);
   const freeSwimCarouselRef = useRef<FlatList<OfficialPool>>(null);
   const freeSwimPools = useMemo(() => getFreeSwimPools(freeSwimSearch), [freeSwimSearch]);
 
@@ -105,16 +109,18 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   // 지도 핀을 탭했을 때(onSelectPool) 하단 카드 캐러셀에서도 그 카드가 보이게 스크롤한다.
   // InfoWindow 위치가 어긋나도, 여기 카드는 항상 정확한 전체 정보를 보여준다.
-  function handleMarkerSelect(id: string) {
+  function selectPool(id: string) {
     setSelectedPoolId(id);
+    setPoolSelectToken((t) => t + 1);
     const index = officialPools.findIndex((p) => p.id === id);
     if (index >= 0) {
       poolCarouselRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
     }
   }
 
-  function handleFreeSwimMarkerSelect(id: string) {
+  function selectFreeSwimPool(id: string) {
     setFreeSwimSelectedId(id);
+    setFreeSwimSelectToken((t) => t + 1);
     const index = freeSwimPools.findIndex((p) => p.id === id);
     if (index >= 0) {
       freeSwimCarouselRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
@@ -201,7 +207,13 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
         ) : tab === 'pools' ? (
           <View style={styles.mapScreen}>
             {isPoolDataConfigured && isNaverMapConfigured && officialPools.length > 0 ? (
-              <PoolMapView pools={officialPools} fill selectedId={selectedPoolId} onSelectPool={handleMarkerSelect} />
+              <PoolMapView
+                pools={officialPools}
+                fill
+                selectedId={selectedPoolId}
+                selectToken={poolSelectToken}
+                onSelectPool={selectPool}
+              />
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.empty}>
@@ -254,7 +266,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                         selected && styles.poolCardFloatingSelected,
                         selected && styles.poolCardFloatingEnlarged,
                       ]}
-                      onPress={() => setSelectedPoolId(item.id)}
+                      onPress={() => selectPool(item.id)}
                     >
                       <View style={styles.poolHeaderRow}>
                         <View style={styles.poolNameRow}>
@@ -361,7 +373,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 pools={freeSwimPools}
                 fill
                 selectedId={freeSwimSelectedId}
-                onSelectPool={handleFreeSwimMarkerSelect}
+                selectToken={freeSwimSelectToken}
+                onSelectPool={selectFreeSwimPool}
               />
             ) : (
               <View style={styles.mapPlaceholder}>
@@ -408,7 +421,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                         selected && styles.poolCardFloatingSelected,
                         selected && styles.poolCardFloatingEnlarged,
                       ]}
-                      onPress={() => setFreeSwimSelectedId(item.id)}
+                      onPress={() => selectFreeSwimPool(item.id)}
                     >
                       <Text style={[styles.poolName, selected && styles.poolNameEnlarged]} numberOfLines={selected ? 2 : 1}>
                         {item.name}

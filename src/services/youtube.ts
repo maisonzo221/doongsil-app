@@ -15,6 +15,9 @@ export interface YoutubeVideo {
   id: string;
   title: string;
   channelTitle: string;
+  /** 화질 높은 순으로, API가 실제로 존재한다고 보고한 썸네일만 담는다.
+   * 화면에서 하나가 깨져서 못 불러오면 다음 후보로 넘어가고, 하나도 없으면 그 영상은 제외한다. */
+  thumbnailCandidates: string[];
   thumbnailUrl: string;
   viewCount: number;
   publishedAt: string;
@@ -87,23 +90,29 @@ async function fetchSwimVideos(
   const statsJson = await statsRes.json();
 
   return (statsJson.items ?? [])
-    .map((item: any) => ({
-      id: item.id,
-      title: item.snippet?.title ?? '',
-      channelTitle: item.snippet?.channelTitle ?? '',
+    .map((item: any) => {
       // medium(320x180)은 큰 그리드/세로 썸네일에선 흐릿하게 뜬다 — 실제로 존재하는
-      // 더 고화질 썸네일부터 순서대로 시도하고, maxres/standard가 없는 영상(쇼츠 등은
-      // 흔함)은 한 단계씩 내려가며 구한다.
-      thumbnailUrl:
-        item.snippet?.thumbnails?.maxres?.url ??
-        item.snippet?.thumbnails?.standard?.url ??
-        item.snippet?.thumbnails?.high?.url ??
-        item.snippet?.thumbnails?.medium?.url ??
-        item.snippet?.thumbnails?.default?.url ??
-        '',
-      viewCount: Number(item.statistics?.viewCount ?? 0),
-      publishedAt: item.snippet?.publishedAt ?? '',
-    }))
+      // 더 고화질 썸네일부터 순서대로 후보에 담고, 화면에서 하나가 깨지면 다음 걸 쓴다.
+      const thumbs = item.snippet?.thumbnails ?? {};
+      const thumbnailCandidates: string[] = [
+        thumbs.maxres?.url,
+        thumbs.standard?.url,
+        thumbs.high?.url,
+        thumbs.medium?.url,
+        thumbs.default?.url,
+      ].filter((url): url is string => !!url);
+      return {
+        id: item.id,
+        title: item.snippet?.title ?? '',
+        channelTitle: item.snippet?.channelTitle ?? '',
+        thumbnailCandidates,
+        thumbnailUrl: thumbnailCandidates[0] ?? '',
+        viewCount: Number(item.statistics?.viewCount ?? 0),
+        publishedAt: item.snippet?.publishedAt ?? '',
+      };
+    })
+    // 썸네일이 하나도 없는 영상은 목록에서 아예 뺀다.
+    .filter((v: YoutubeVideo) => v.thumbnailCandidates.length > 0)
     .sort((a: YoutubeVideo, b: YoutubeVideo) => b.viewCount - a.viewCount);
 }
 
@@ -133,6 +142,60 @@ export async function searchSwimVideos(
       return videos;
     }
     // 빈 결과(쿼터 초과/네트워크 문제 등)면 오래된 캐시라도 있으면 그걸로 버틴다.
+    return cached?.videos ?? [];
+  } catch {
+    return cached?.videos ?? [];
+  }
+}
+
+const TRENDING_QUERY = '수영 팁 shorts';
+// 최근 업로드만으로는 개수가 모자랄 때 채워 넣을 다른 수영 주제들 — 매번 그 중 하나를
+// 무작위로 골라서, 모자란 칸을 "오늘은 자유형, 내일은 배영" 식으로 다르게 채운다.
+const TRENDING_FALLBACK_TOPICS = [
+  '수영 자유형 꿀팁',
+  '수영 배영 연습',
+  '수영 평영 기초',
+  '수영 접영 연습',
+  '수영 호흡법',
+  '수영 다이어트',
+];
+
+/** "오늘의 인기 쇼츠"용. 최근 14일 업로드로 먼저 채우고, 그걸로 개수가 모자라면
+ * 수영 주제 중 하나를 무작위로 골라 전체 기간에서 보충한다 — 그래서 최근 쇼츠가
+ * 적은 날에도 칸이 비지 않고, 항상 실제 수영 영상으로만 채워진다. */
+export async function searchTrendingShorts(maxResults = 4): Promise<YoutubeVideo[]> {
+  if (!API_KEY) return [];
+
+  const cacheKey = `${CACHE_PREFIX}trending:${maxResults}`;
+  const slotId = currentSlotId();
+  const cached = await readCache(cacheKey);
+  if (cached && cached.slotId === slotId) {
+    return cached.videos;
+  }
+
+  try {
+    const recent = await fetchSwimVideos(TRENDING_QUERY, maxResults * 2, 14);
+    const videos = [...recent];
+    const seenIds = new Set(videos.map((v) => v.id));
+
+    if (videos.length < maxResults) {
+      const fallbackQuery =
+        TRENDING_FALLBACK_TOPICS[Math.floor(Math.random() * TRENDING_FALLBACK_TOPICS.length)];
+      const fallback = await fetchSwimVideos(fallbackQuery, maxResults * 2);
+      for (const v of fallback) {
+        if (videos.length >= maxResults) break;
+        if (!seenIds.has(v.id)) {
+          videos.push(v);
+          seenIds.add(v.id);
+        }
+      }
+    }
+
+    const final = videos.slice(0, maxResults);
+    if (final.length > 0) {
+      await writeCache(cacheKey, { slotId, videos: final });
+      return final;
+    }
     return cached?.videos ?? [];
   } catch {
     return cached?.videos ?? [];

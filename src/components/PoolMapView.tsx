@@ -10,6 +10,10 @@ interface Props {
   fill?: boolean;
   /** 이 id의 수영장으로 지도를 이동시키고 팝업을 띄운다 (하단 카드 탭 연동용). */
   selectedId?: string | null;
+  /** 같은 selectedId를 다시 탭해도(이미 선택된 1번째 카드를 또 누르는 경우 등) 지도가
+   * 다시 이동하도록, 호출될 때마다 바뀌는 값을 넘긴다 — id 자체는 안 바뀌어도 이 값이
+   * 바뀌면 지도가 다시 그 수영장으로 이동한다. */
+  selectToken?: number;
   /** 지도 위 핀을 직접 탭했을 때 호출된다 — 하단 카드 캐러셀을 그 카드로 스크롤/선택시키는 용도. */
   onSelectPool?: (id: string) => void;
 }
@@ -127,7 +131,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 </html>`;
 }
 
-export default function PoolMapView({ pools, fill, selectedId, onSelectPool }: Props) {
+export default function PoolMapView({ pools, fill, selectedId, selectToken, onSelectPool }: Props) {
   const webviewRef = useRef<WebView>(null);
   const points = useMemo(
     () =>
@@ -143,7 +147,10 @@ export default function PoolMapView({ pools, fill, selectedId, onSelectPool }: P
     webviewRef.current?.injectJavaScript(
       `window.flyToPool && window.flyToPool(${JSON.stringify(selectedId)}); true;`
     );
-  }, [selectedId]);
+    // selectToken은 일부러 의존성에 넣는다 — 이미 선택돼 있던 카드를 다시 눌러서
+    // selectedId 값 자체는 안 바뀌어도, 지도가 다시 그쪽으로 이동해야 하기 때문.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, selectToken]);
 
   function handleMessage(event: WebViewMessageEvent) {
     let msg: { type: string; id: string };

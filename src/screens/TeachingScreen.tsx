@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Linking,
@@ -18,15 +19,17 @@ import {
   formatViewCount,
   isYoutubeConfigured,
   searchSwimVideos,
+  searchTrendingShorts,
   youtubeWatchUrl,
   YoutubeVideo,
 } from '../services/youtube';
 
 function openInYoutube(id: string) {
-  Linking.openURL(youtubeWatchUrl(id));
+  Alert.alert('유튜브로 이동', '영상을 보려면 유튜브 앱(또는 웹)으로 이동해요.', [
+    { text: '취소', style: 'cancel' },
+    { text: '이동', onPress: () => Linking.openURL(youtubeWatchUrl(id)) },
+  ]);
 }
-
-const TOP_QUERY = '수영 팁 shorts';
 
 const CATEGORIES: { title: string; query: string }[] = [
   { title: '자유형 팁', query: '자유형 영법 교정' },
@@ -40,17 +43,31 @@ function VideoThumb({
   style,
   vertical,
   onPress,
+  onBroken,
 }: {
   video: YoutubeVideo;
   style?: any;
   vertical?: boolean;
   onPress: () => void;
+  onBroken: (id: string) => void;
 }) {
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const uri = video.thumbnailCandidates[candidateIndex];
+
   return (
     <TouchableOpacity style={[styles.thumbCard, style]} onPress={onPress}>
       <Image
-        source={{ uri: video.thumbnailUrl }}
+        source={{ uri }}
         style={[styles.thumbImage, vertical && styles.thumbImageVertical]}
+        onError={() => {
+          // 이 화질 썸네일이 깨져 있으면 한 단계 낮은 후보로 넘어가고, 다 깨졌으면
+          // 목록에서 이 영상을 숨긴다 — 깨진 이미지 칸이 그대로 보이지 않게.
+          if (candidateIndex < video.thumbnailCandidates.length - 1) {
+            setCandidateIndex((i) => i + 1);
+          } else {
+            onBroken(video.id);
+          }
+        }}
       />
       <Text style={styles.thumbTitle} numberOfLines={2}>
         {video.title}
@@ -65,6 +82,7 @@ function VideoThumb({
 function CategoryRow({ title, query }: { title: string; query: string }) {
   const [videos, setVideos] = useState<YoutubeVideo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
 
   // 탭에 다시 들어올 때마다 다시 확인한다 — 같은 슬롯(아침6시~저녁6시 등) 안이면
   // 캐시된 결과가 바로 돌아오고, 슬롯이 바뀌었으면 실제로 새로 검색한다.
@@ -74,6 +92,7 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
       searchSwimVideos(query, 6).then((v) => {
         if (!cancelled) {
           setVideos(v);
+          setBrokenIds(new Set());
           setLoading(false);
         }
       });
@@ -83,7 +102,8 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
     }, [query])
   );
 
-  if (!loading && videos.length === 0) return null;
+  const visibleVideos = videos.filter((v) => !brokenIds.has(v.id));
+  if (!loading && visibleVideos.length === 0) return null;
 
   return (
     <View style={styles.categorySection}>
@@ -92,13 +112,18 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
         <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
       ) : (
         <FlatList
-          data={videos}
+          data={visibleVideos}
           keyExtractor={(v) => v.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => (
-            <VideoThumb video={item} style={styles.categoryThumb} onPress={() => openInYoutube(item.id)} />
+            <VideoThumb
+              video={item}
+              style={styles.categoryThumb}
+              onPress={() => openInYoutube(item.id)}
+              onBroken={(id) => setBrokenIds((prev) => new Set(prev).add(id))}
+            />
           )}
         />
       )}
@@ -109,14 +134,17 @@ function CategoryRow({ title, query }: { title: string; query: string }) {
 export default function TeachingScreen() {
   const [topVideos, setTopVideos] = useState<YoutubeVideo[]>([]);
   const [loadingTop, setLoadingTop] = useState(true);
+  const [topBrokenIds, setTopBrokenIds] = useState<Set<string>>(new Set());
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      // 최근 14일 내 업로드로 한정 — "오늘의 인기 쇼츠"가 트렌드를 반영하게 한다.
-      searchSwimVideos(TOP_QUERY, 4, 14).then((v) => {
+      // 최근 14일 업로드로 먼저 채우고, 모자라면 다른 수영 주제로 자동 보충한다
+      // (매일 새벽 6시/저녁 6시에 슬롯이 바뀌면서 새로 받아온다).
+      searchTrendingShorts(4).then((v) => {
         if (!cancelled) {
           setTopVideos(v);
+          setTopBrokenIds(new Set());
           setLoadingTop(false);
         }
       });
@@ -125,6 +153,8 @@ export default function TeachingScreen() {
       };
     }, [])
   );
+
+  const visibleTopVideos = topVideos.filter((v) => !topBrokenIds.has(v.id));
 
   if (!isYoutubeConfigured) {
     return (
@@ -146,13 +176,14 @@ export default function TeachingScreen() {
           <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
         ) : (
           <View style={styles.topGrid}>
-            {topVideos.slice(0, 4).map((v) => (
+            {visibleTopVideos.slice(0, 4).map((v) => (
               <VideoThumb
                 key={v.id}
                 video={v}
                 style={styles.topThumb}
                 vertical
                 onPress={() => openInYoutube(v.id)}
+                onBroken={(id) => setTopBrokenIds((prev) => new Set(prev).add(id))}
               />
             ))}
           </View>
