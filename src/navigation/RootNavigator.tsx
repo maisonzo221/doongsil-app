@@ -11,6 +11,7 @@ import ShopScreen from '../screens/ShopScreen';
 import TeachingScreen from '../screens/TeachingScreen';
 import TipRoomHomeScreen from '../screens/tiproom/TipRoomHomeScreen';
 import PostDetailScreen from '../screens/tiproom/PostDetailScreen';
+import UserProfileScreen from '../screens/tiproom/UserProfileScreen';
 import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
@@ -101,6 +102,11 @@ function TipRoomStackNavigator() {
         name="PostDetail"
         component={PostDetailScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <TipRoomStack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={{ headerShown: true, title: '프로필', headerBackButtonDisplayMode: 'minimal' }}
       />
     </TipRoomStack.Navigator>
   );

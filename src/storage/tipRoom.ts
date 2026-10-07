@@ -1,6 +1,9 @@
 // 가이드: 자유게시판 + 수영장 찾기(자유수영) — Supabase 백엔드 연동.
 import { supabase } from '../lib/supabase';
+import { containsProfanity } from '../utils/profanity';
 import { getCurrentUser } from './auth';
+
+export class ProfanityBlockedError extends Error {}
 
 export interface BoardPost {
   id: string;
@@ -33,6 +36,23 @@ export interface Pool {
 }
 
 export const BOARD_CATEGORIES = ['자유', '수영 팁', '수영복', '오늘의 수영복', '자유수영 루틴'];
+
+/** 프로필 화면에서 "작성한 글/댓글 수"로 보여주는 용도. */
+export async function getPostCountByAuthor(authorId: string): Promise<number> {
+  const { count } = await supabase
+    .from('board_posts')
+    .select('id', { count: 'exact', head: true })
+    .eq('author_id', authorId);
+  return count ?? 0;
+}
+
+export async function getCommentCountByAuthor(authorId: string): Promise<number> {
+  const { count } = await supabase
+    .from('board_comments')
+    .select('id', { count: 'exact', head: true })
+    .eq('author_id', authorId);
+  return count ?? 0;
+}
 
 function postAuthorName(row: any): string {
   return row.profiles?.nickname_ko || row.profiles?.nickname_en || '알 수 없음';
@@ -83,9 +103,18 @@ export async function getComments(postId: string): Promise<BoardComment[]> {
 }
 
 export async function addComment(postId: string, body: string): Promise<void> {
+  if (containsProfanity(body)) {
+    throw new ProfanityBlockedError('비속어가 포함되어 있어요.');
+  }
   const me = await getCurrentUser();
   if (!me) return;
-  await supabase.from('board_comments').insert({ post_id: postId, author_id: me.id, body });
+  const { error } = await supabase.from('board_comments').insert({ post_id: postId, author_id: me.id, body });
+  if (error) {
+    if (error.message?.includes('profanity_blocked')) {
+      throw new ProfanityBlockedError('비속어가 포함되어 있어요.');
+    }
+    throw error;
+  }
 }
 
 export async function getPools(): Promise<Pool[]> {

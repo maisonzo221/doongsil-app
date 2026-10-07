@@ -14,6 +14,7 @@ import { NotingIcon } from '../components/icons/TabIcons';
 import { SwimRecord } from '../types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
+import { pushMyStats } from '../storage/profileStats';
 import {
   getMonthActivitySummaries,
   getTodayActivitySummary,
@@ -58,6 +59,9 @@ export default function CalendarScreen({ navigation }: Props) {
       // 빠져나간다 — 과거 수영 기록을 다 가져온 뒤에 기록 목록을 새로고침한다.
       importHealthHistoryOnce().finally(() => {
         getAllRecords().then(setRecords);
+        // 수친이 내 프로필에서 최신 평균 수영 데이터를 볼 수 있게, 캘린더를 열 때마다
+        // 로컬 기록 기준으로 다시 계산해서 서버에 올려둔다.
+        pushMyStats();
       });
       getTodayActivitySummary(todayString()).then((summary) => {
         if (summary) setTodayActivity(summary);

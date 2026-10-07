@@ -1,21 +1,67 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
-import { deleteAccount, getCurrentUser, signOut, UserProfile } from '../../storage/auth';
+import { deleteAccount, getCurrentUser, signOut, updateSwimSince, UserProfile } from '../../storage/auth';
 import { PRIVACY_POLICY_URL } from '../../config/links';
+import { swimTenureLabel } from '../../utils/swimTenure';
 
 type Props = NativeStackScreenProps<FriendsStackParamList, 'Settings'>;
 
 export default function SettingsScreen({}: Props) {
   const [me, setMe] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editingTenure, setEditingTenure] = useState(false);
+  const [tenureYear, setTenureYear] = useState('');
+  const [tenureMonth, setTenureMonth] = useState('');
+  const [tenureDay, setTenureDay] = useState('');
+  const [savingTenure, setSavingTenure] = useState(false);
 
   useEffect(() => {
-    getCurrentUser().then(setMe);
+    getCurrentUser().then((user) => {
+      setMe(user);
+      if (user?.swimSince) {
+        const [y, m, d] = user.swimSince.split('-');
+        setTenureYear(y);
+        setTenureMonth(m);
+        setTenureDay(d);
+      }
+    });
   }, []);
+
+  async function handleSaveTenure() {
+    const y = Number(tenureYear);
+    const m = Number(tenureMonth);
+    const d = Number(tenureDay);
+    const valid =
+      y >= 1950 && y <= new Date().getFullYear() && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+    if (!valid) {
+      Alert.alert('날짜 확인', '연도/월/일을 다시 확인해주세요.');
+      return;
+    }
+    const dateString = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    setSavingTenure(true);
+    try {
+      await updateSwimSince(dateString);
+      setMe((prev) => (prev ? { ...prev, swimSince: dateString } : prev));
+      setEditingTenure(false);
+    } catch {
+      Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
+    } finally {
+      setSavingTenure(false);
+    }
+  }
 
   function handleSignOut() {
     Alert.alert('로그아웃', '정말 로그아웃하시겠어요?', [
@@ -61,6 +107,57 @@ export default function SettingsScreen({}: Props) {
                 <Text style={styles.cardValue}>{me.inviteCode}</Text>
               </>
             )}
+
+            <Text style={[styles.cardLabel, { marginTop: spacing.sm }]}>수력</Text>
+            {editingTenure ? (
+              <View>
+                <View style={styles.tenureInputRow}>
+                  <TextInput
+                    style={styles.tenureInput}
+                    placeholder="연도"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    value={tenureYear}
+                    onChangeText={setTenureYear}
+                  />
+                  <Text style={styles.tenureSep}>년</Text>
+                  <TextInput
+                    style={styles.tenureInput}
+                    placeholder="월"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    value={tenureMonth}
+                    onChangeText={setTenureMonth}
+                  />
+                  <Text style={styles.tenureSep}>월</Text>
+                  <TextInput
+                    style={styles.tenureInput}
+                    placeholder="일"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    value={tenureDay}
+                    onChangeText={setTenureDay}
+                  />
+                  <Text style={styles.tenureSep}>일</Text>
+                </View>
+                <TouchableOpacity style={styles.tenureSaveBtn} onPress={handleSaveTenure} disabled={savingTenure}>
+                  {savingTenure ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.tenureSaveBtnText}>저장</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => setEditingTenure(true)}>
+                <Text style={styles.cardValue}>
+                  {swimTenureLabel(me.swimSince)} {me.swimSince ? '· 수정' : '· 설정하기'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -103,4 +200,25 @@ const styles = StyleSheet.create({
   },
   rowText: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
   dangerText: { color: '#D9453C' },
+  tenureInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
+  tenureInput: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.hairline + 2,
+    paddingVertical: 6,
+    fontFamily: fonts.regular,
+    color: colors.text,
+    width: 52,
+    textAlign: 'center',
+  },
+  tenureSep: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 13 },
+  tenureSaveBtn: {
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+  },
+  tenureSaveBtnText: { fontFamily: fonts.semibold, color: colors.white, fontSize: 13 },
 });

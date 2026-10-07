@@ -22,8 +22,9 @@ import {
   deleteBoardPost,
   getBoardPosts,
   getComments,
+  ProfanityBlockedError,
 } from '../../storage/tipRoom';
-import { getCurrentUser } from '../../storage/auth';
+import { getCurrentUser, UserProfile as Me } from '../../storage/auth';
 
 type Props = NativeStackScreenProps<TipRoomStackParamList, 'PostDetail'>;
 
@@ -39,7 +40,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
   const [post, setPost] = useState<BoardPost | null>(null);
   const [comments, setComments] = useState<BoardComment[]>([]);
-  const [myId, setMyId] = useState<string | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [draft, setDraft] = useState('');
 
   const reload = useCallback(async () => {
@@ -48,7 +49,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
       getBoardPosts(),
       getComments(postId),
     ]);
-    setMyId(user?.id ?? null);
+    setMe(user);
     setPost(posts.find((p) => p.id === postId) ?? null);
     setComments(commentList);
   }, [postId]);
@@ -61,26 +62,49 @@ export default function PostDetailScreen({ route, navigation }: Props) {
 
   async function handleSendComment() {
     if (!draft.trim()) return;
-    await addComment(postId, draft.trim());
-    setDraft('');
-    await reload();
+    try {
+      await addComment(postId, draft.trim());
+      setDraft('');
+      await reload();
+    } catch (e) {
+      if (e instanceof ProfanityBlockedError) {
+        Alert.alert('등록 불가', '비속어가 포함되어 있어서 등록할 수 없어요.');
+      } else {
+        Alert.alert('등록 실패', '잠시 후 다시 시도해주세요.');
+      }
+    }
+  }
+
+  function runDeletePost() {
+    deleteBoardPost(postId).then(() => navigation.goBack());
   }
 
   function handleDeletePost() {
+    // 댓글이 달린 글을 관리자가 지울 때는 한 번 더 확인한다 — 일반 사용자는 애초에
+    // 이 버튼 자체가 안 보인다(아래 렌더링 조건 참고).
+    if (comments.length > 0 && me?.isAdmin) {
+      Alert.alert(
+        '정말 삭제하시겠습니까?',
+        '댓글이 달린 글이에요. 삭제하면 댓글도 함께 사라지고 되돌릴 수 없어요.',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '삭제', style: 'destructive', onPress: runDeletePost },
+        ]
+      );
+      return;
+    }
     Alert.alert('글 삭제', '이 글을 삭제할까요?', [
       { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteBoardPost(postId);
-          navigation.goBack();
-        },
-      },
+      { text: '삭제', style: 'destructive', onPress: runDeletePost },
     ]);
   }
 
   if (!post) return <ScreenBackground><View /></ScreenBackground>;
+
+  const isAuthor = post.authorId === me?.id;
+  // 일반 사용자는 본인 글이고 댓글이 없을 때만 삭제 가능. 관리자는 항상 가능
+  // (댓글 있는 글은 위에서 한 번 더 확인받는다).
+  const canDelete = me?.isAdmin || (isAuthor && comments.length === 0);
 
   return (
     <ScreenBackground>
@@ -90,12 +114,15 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             <Text style={styles.categoryBadgeText}>{post.category}</Text>
           </View>
           <Text style={styles.title}>{post.title}</Text>
-          <Text style={styles.meta}>
-            {post.authorNickname} · {timeAgo(post.createdAt)}
-          </Text>
+          <View style={styles.metaRow}>
+            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: post.authorId })}>
+              <Text style={styles.metaAuthor}>{post.authorNickname}</Text>
+            </TouchableOpacity>
+            <Text style={styles.meta}> · {timeAgo(post.createdAt)}</Text>
+          </View>
           <Text style={styles.body}>{post.body}</Text>
 
-          {post.authorId === myId && (
+          {canDelete && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDeletePost}>
               <Text style={styles.deleteBtnText}>글 삭제</Text>
             </TouchableOpacity>
@@ -104,7 +131,9 @@ export default function PostDetailScreen({ route, navigation }: Props) {
           <Text style={styles.commentTitle}>댓글 {comments.length}</Text>
           {comments.map((c) => (
             <View key={c.id} style={styles.commentRow}>
-              <Text style={styles.commentAuthor}>{c.authorNickname}</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: c.authorId })}>
+                <Text style={styles.commentAuthor}>{c.authorNickname}</Text>
+              </TouchableOpacity>
               <Text style={styles.commentBody}>{c.body}</Text>
             </View>
           ))}
@@ -140,7 +169,9 @@ const styles = StyleSheet.create({
   },
   categoryBadgeText: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 11 },
   title: { fontFamily: fonts.bold, fontSize: 20, color: colors.text },
-  meta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  metaAuthor: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
+  meta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12 },
   body: { fontFamily: fonts.regular, color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   deleteBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
   deleteBtnText: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },

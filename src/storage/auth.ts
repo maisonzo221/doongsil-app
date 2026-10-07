@@ -29,12 +29,16 @@ export interface UserProfile {
   inviteCode: string | null;
   provider: 'apple' | 'guest';
   contactsSynced: boolean;
+  /** 자유게시판 관리자 — Supabase에서 수동으로 지정한 계정만 true (migration_007 참고). */
+  isAdmin: boolean;
+  /** 수영을 시작한 날짜(YYYY-MM-DD). 수력 계산에 쓴다. */
+  swimSince: string | null;
 }
 
 async function fetchOrCreateProfile(userId: string, fallbackName: string): Promise<UserProfile> {
   const { data: existing } = await supabase
     .from('profiles')
-    .select('id, nickname_ko, nickname_en, invite_code')
+    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since')
     .eq('id', userId)
     .maybeSingle();
 
@@ -46,6 +50,8 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
       inviteCode: existing.invite_code,
       provider: 'apple',
       contactsSynced: false,
+      isAdmin: existing.is_admin ?? false,
+      swimSince: existing.swim_since ?? null,
     };
   }
 
@@ -60,7 +66,7 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
       nickname_en: fallbackName,
       invite_code: inviteCode,
     })
-    .select('id, nickname_ko, nickname_en, invite_code')
+    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since')
     .single();
 
   if (error || !inserted) {
@@ -74,6 +80,8 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
     inviteCode: inserted.invite_code,
     provider: 'apple',
     contactsSynced: false,
+    isAdmin: inserted.is_admin ?? false,
+    swimSince: inserted.swim_since ?? null,
   };
 }
 
@@ -94,6 +102,8 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
           inviteCode: null,
           provider: 'apple',
           contactsSynced: false,
+          isAdmin: false,
+          swimSince: null,
         };
       }
     }
@@ -135,6 +145,8 @@ export async function signInWithApple(): Promise<UserProfile> {
       inviteCode: null,
       provider: 'apple',
       contactsSynced: false,
+      isAdmin: false,
+      swimSince: null,
     };
     await AsyncStorage.setItem(GUEST_KEY, JSON.stringify(profile));
     return profile;
@@ -159,6 +171,8 @@ export async function continueAsGuest(): Promise<UserProfile> {
     inviteCode: null,
     provider: 'guest',
     contactsSynced: false,
+    isAdmin: false,
+    swimSince: null,
   };
   await AsyncStorage.setItem(GUEST_KEY, JSON.stringify(profile));
   return profile;
@@ -171,6 +185,13 @@ export async function updateNicknames(nicknameKo: string, nicknameEn: string): P
     .from('profiles')
     .update({ nickname_ko: nicknameKo, nickname_en: nicknameEn })
     .eq('id', user.id);
+}
+
+/** 수력 계산 기준일을 설정한다(최초 1회 설정이든 수정이든 동일). dateString은 YYYY-MM-DD. */
+export async function updateSwimSince(dateString: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || user.provider !== 'apple' || !isSupabaseConfigured) return;
+  await supabase.from('profiles').update({ swim_since: dateString }).eq('id', user.id);
 }
 
 /**

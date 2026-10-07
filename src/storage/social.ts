@@ -67,6 +67,20 @@ export async function getFriends(): Promise<Friend[]> {
     }));
 }
 
+/** 특정 사용자와 이미 수친 사이인지 확인한다 (프로필 화면에서 평균 수영 데이터
+ * 노출 여부, 수친 추가 버튼 노출 여부를 가르는 데 쓴다). */
+export async function isFriend(targetId: string): Promise<boolean> {
+  const me = await getCurrentUser();
+  if (!me) return false;
+  const { data } = await supabase
+    .from('friendships')
+    .select('friend_id')
+    .eq('user_id', me.id)
+    .eq('friend_id', targetId)
+    .maybeSingle();
+  return !!data;
+}
+
 /** 친구 하나를 내 기준으로 원하는 카테고리(예: "A수영장 수업")로 분류한다. */
 export async function updateFriendCategory(friendId: string, category: string | null): Promise<void> {
   const me = await getCurrentUser();
