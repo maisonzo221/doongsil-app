@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -22,7 +23,10 @@ import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList } from './socialTypes';
 import { TipRoomStackParamList } from './tipRoomTypes';
 import { FEATURE_FLAGS } from '../config/featureFlags';
-import { getCurrentUser, onAuthChange, UserProfile } from '../storage/auth';
+import { getCurrentUser, onAuthChange, updatePushToken, UserProfile } from '../storage/auth';
+import { registerForPushNotificationsAsync } from '../services/pushNotifications';
+import { getGroupById } from '../storage/social';
+import { navigateToChatRoom, navigationRef } from './navigationRef';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
@@ -156,12 +160,35 @@ export default function RootNavigator() {
     });
   }, []);
 
+  // 로그인된 사용자의 푸시 토큰을 등록하고(수톡/톡톡 메시지 오면 카카오톡처럼 알림
+  // 뜨게), 알림을 탭했을 때 해당 수톡방으로 바로 이동시킨다.
+  useEffect(() => {
+    if (!user || user === 'loading' || user.provider !== 'apple') return;
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) updatePushToken(token);
+    });
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const data = response.notification.request.content.data as { groupId?: string } | undefined;
+      if (!data?.groupId) return;
+      const group = await getGroupById(data.groupId);
+      if (!group) return;
+      navigateToChatRoom({
+        groupId: group.id,
+        groupName: group.name,
+        ownerId: group.ownerId,
+        roomKind: group.roomKind,
+      });
+    });
+    return () => subscription.remove();
+  }, [user]);
+
   if (user === 'loading') {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       {user ? <AppTabs /> : <AuthScreen onAuthenticated={setUser} />}
     </NavigationContainer>
   );

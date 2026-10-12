@@ -196,6 +196,14 @@ export async function updatePhoneNumber(e164: string): Promise<void> {
   if (error) throw error;
 }
 
+/** 이 기기의 Expo 푸시 토큰을 등록한다 — 수톡/톡톡에 메시지가 오면 서버가 이 토큰으로
+ * 푸시 알림을 보낸다(migration_010의 notify_chat_message 트리거 참고). */
+export async function updatePushToken(token: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || user.provider !== 'apple' || !isSupabaseConfigured) return;
+  await supabase.from('profiles').update({ expo_push_token: token }).eq('id', user.id);
+}
+
 export async function updateNicknames(nicknameKo: string, nicknameEn: string): Promise<void> {
   const user = await getCurrentUser();
   if (!user || user.provider !== 'apple' || !isSupabaseConfigured) return;
