@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { MembersIcon } from '../../components/icons/TabIcons';
@@ -57,7 +56,6 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [inviteModal, setInviteModal] = useState(false);
   const [invitableFriends, setInvitableFriends] = useState<Friend[]>([]);
   const [invitingId, setInvitingId] = useState<string | null>(null);
-  const headerHeight = useHeaderHeight();
 
   const isOwner = !!myId && myId === ownerId;
 
@@ -123,17 +121,43 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     const unsubscribe = subscribeToMessages(groupId, (message) => {
-      setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === message.id)) return prev;
+        // 내가 방금 낙관적으로 먼저 화면에 띄워둔 임시 메시지가 있으면, 실제 서버
+        // 메시지가 도착했을 때 그걸로 바꿔치기한다 (안 그러면 같은 메시지가 두 번 보임).
+        const withoutOptimistic = prev.filter(
+          (m) =>
+            !(
+              m.id.startsWith('temp-') &&
+              m.senderId === message.senderId &&
+              m.type === message.type &&
+              m.text === message.text &&
+              m.sharedSummary === message.sharedSummary
+            )
+        );
+        return [...withoutOptimistic, message];
+      });
     });
     return unsubscribe;
   }, [groupId]);
 
   async function handleSend() {
-    if (!draft.trim()) return;
+    const text = draft.trim();
+    if (!text || !myId) return;
+    // 보내고 나서 실시간 구독으로 다시 돌아올 때까지 기다리면 버튼 누른 것치고
+    // 반응이 느리게 느껴져서, 일단 화면에 바로 띄워두고(낙관적 업데이트) 실제
+    // 전송은 뒤에서 진행한다. 실패하면 이 임시 메시지만 지우고 입력창을 복원한다.
+    const tempId = `temp-${Date.now()}`;
+    setDraft('');
+    setMessages((prev) => [
+      ...prev,
+      { id: tempId, groupId, senderId: myId, type: 'text', text, createdAt: new Date().toISOString() },
+    ]);
     try {
-      await sendTextMessage(groupId, draft.trim());
-      setDraft('');
+      await sendTextMessage(groupId, text);
     } catch (e) {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setDraft(text);
       if (e instanceof ProfanityBlockedError) {
         Alert.alert('전송 불가', '비속어가 포함되어 있어 보낼 수 없어요.');
       } else {
@@ -214,11 +238,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
 
   return (
     <ScreenBackground>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{groupName}</Text>
         </View>

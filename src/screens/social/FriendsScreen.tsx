@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Modal,
+  PanResponder,
   ScrollView,
   SectionList,
   StyleSheet,
@@ -37,6 +38,7 @@ const UNCATEGORIZED = '미분류';
 
 type SubTab = 'friends' | 'sutok' | 'toktok';
 const SUB_TAB_LABEL: Record<SubTab, string> = { friends: '친구', sutok: '수톡', toktok: '톡톡' };
+const SUB_TAB_ORDER: SubTab[] = ['friends', 'sutok', 'toktok'];
 
 // 한글(가나다) -> 영문 알파벳 -> 숫자 -> 그 외 순서로 묶어서 정렬한다.
 function charClass(ch: string | undefined): number {
@@ -226,6 +228,26 @@ export default function FriendsScreen({ navigation, route }: Props) {
     await reload();
   }
 
+  // 친구/수톡/톡톡 탭 화면에서만 좌우로 밀어서 탭을 넘길 수 있게 한다(채팅방
+  // 안으로 들어가면 이 화면 자체가 안 떠 있으니 자연히 적용 안 됨). 세로 스크롤과
+  // 헷갈리지 않게, 가로로 뚜렷하게 민 경우에만(세로보다 2배 이상) 반응한다.
+  const subTabRef = useRef(subTab);
+  subTabRef.current = subTab;
+  const tabPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > 24 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      onPanResponderRelease: (_, gesture) => {
+        const currentIndex = SUB_TAB_ORDER.indexOf(subTabRef.current);
+        if (gesture.dx < -40 && currentIndex < SUB_TAB_ORDER.length - 1) {
+          setSubTab(SUB_TAB_ORDER[currentIndex + 1]);
+        } else if (gesture.dx > 40 && currentIndex > 0) {
+          setSubTab(SUB_TAB_ORDER[currentIndex - 1]);
+        }
+      },
+    })
+  ).current;
+
   return (
     <ScreenBackground>
       <View style={styles.container}>
@@ -250,6 +272,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        <View style={styles.flex} {...tabPanResponder.panHandlers}>
         {subTab === 'sutok' ? (
           <GroupsScreen kind="sutok" navigation={navigation} />
         ) : subTab === 'toktok' ? (
@@ -317,6 +340,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
             )}
           </>
         )}
+        </View>
       </View>
 
       {/* 닉네임 수정 모달 */}
@@ -471,6 +495,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  flex: { flex: 1 },
   title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   settingsIcon: { fontSize: 22 },
