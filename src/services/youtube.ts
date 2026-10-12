@@ -125,11 +125,47 @@ async function fetchSwimVideos(
     .sort((a: YoutubeVideo, b: YoutubeVideo) => b.viewCount - a.viewCount);
 }
 
+// 문자열을 32비트 정수로 해시한다 (seededShuffle의 시드용 — 날짜/쿼리별로 매번 다르지만
+// 재현 가능한 숫자가 필요해서).
+function hashString(input: string): number {
+  let h = 0;
+  for (let i = 0; i < input.length; i++) {
+    h = (Math.imul(31, h) + input.charCodeAt(i)) | 0;
+  }
+  return h >>> 0;
+}
+
+// seed로 결정되는, 매번 똑같이 재현되는 셔플(mulberry32 PRNG + Fisher-Yates) — 진짜
+// Math.random()을 쓰면 캐시를 다시 읽을 때마다 순서가 달라져서 못 쓴다.
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  let s = seed;
+  const next = () => {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 /** 검색어로 영상을 찾고, 조회수 기준으로 정렬해서 돌려준다.
  * recentDays를 주면 최근 N일 내 업로드로 한정해서 검색한다(트렌드성 섹션용) —
  * 안 주면 평소처럼 relevance 기준 전체 기간에서 찾는다(가이드성 섹션용).
- * 같은 "슬롯"(아침6시~저녁6시, 저녁6시~다음날아침6시) 안에서는 캐시된 결과를 재사용하고,
- * 슬롯이 바뀌면 실제로 새로 검색한다. */
+ *
+ * relevance 검색은 같은 검색어면 거의 항상 똑같은 상위 결과를 돌려준다 — 그래서 캐시
+ * 슬롯이 바뀌어서 다시 검색해도 "자유형 영법 교정" 같은 검색어는 매번 똑같은 영상
+ * 6개만 나왔었다. 이제 relevance 검색은 실제 필요한 개수보다 훨씬 많이(최대 20개)
+ * 받아와서, 그 안에서 슬롯(날짜)마다 다른 부분집합을 골라 보여준다 — 그래서 품질은
+ * 유지하면서도 매일 새벽 6시/저녁 6시마다 실제로 다른 영상이 보인다.
+ *
+ * recentDays가 있는(최신 업로드 한정) 검색은 애초에 그 자체로 매번 달라지니 그대로 둔다.
+ */
 export async function searchSwimVideos(
   query: string,
   maxResults = 8,
@@ -145,7 +181,13 @@ export async function searchSwimVideos(
   }
 
   try {
-    const videos = await fetchSwimVideos(query, maxResults, recentDays);
+    const fetchCount = recentDays ? maxResults : Math.max(maxResults * 3, 20);
+    const pool = await fetchSwimVideos(query, fetchCount, recentDays);
+    const videos = recentDays
+      ? pool
+      : seededShuffle(pool, hashString(`${slotId}:${query}`))
+          .slice(0, maxResults)
+          .sort((a, b) => b.viewCount - a.viewCount);
     if (videos.length > 0) {
       await writeCache(cacheKey, { slotId, videos });
       return videos;
