@@ -75,6 +75,26 @@ async function writeCache(cacheKey: string, entry: CachedEntry): Promise<void> {
   }
 }
 
+// 유튜브 safeSearch=strict로 걸러지는 것과는 별개로, 제목/채널명/설명에 이런 단어가
+// 있으면 한 번 더 걸러낸다 — 수영 관련 검색이라도 섞여 들어올 수 있는 음란물/성인물/
+// 마약/도박 관련 영상을 이중으로 막기 위함.
+const BANNED_CONTENT_PATTERN =
+  /(야동|성인방송|19금|노출방송|누드|섹스|자위|음란|마약|필로폰|대마초|도박|불법토토|토토사이트|카지노|베팅사이트|porn|xxx|nsfw|onlyfans|nude|naked girl|sex tape|cocaine|marijuana|weed strain|gambling site|casino bonus)/i;
+
+function isBannedContent(title: string, channelTitle: string, description: string): boolean {
+  return BANNED_CONTENT_PATTERN.test(`${title} ${channelTitle} ${description}`);
+}
+
+const HANGUL_PATTERN = /[가-힣]/;
+
+// 한국 영상을 우선으로(제목에 한글 포함 여부), 그 안에서는 조회수순.
+function compareKoreanFirst(a: YoutubeVideo, b: YoutubeVideo): number {
+  const aKo = HANGUL_PATTERN.test(a.title) ? 1 : 0;
+  const bKo = HANGUL_PATTERN.test(b.title) ? 1 : 0;
+  if (aKo !== bKo) return bKo - aKo;
+  return b.viewCount - a.viewCount;
+}
+
 async function fetchSwimVideos(
   query: string,
   maxResults: number,
@@ -82,7 +102,8 @@ async function fetchSwimVideos(
 ): Promise<YoutubeVideo[]> {
   let url =
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}` +
-    `&videoEmbeddable=true&q=${encodeURIComponent(query)}&relevanceLanguage=ko&key=${API_KEY}`;
+    `&videoEmbeddable=true&safeSearch=strict&regionCode=KR` +
+    `&q=${encodeURIComponent(query)}&relevanceLanguage=ko&key=${API_KEY}`;
   if (recentDays) {
     const publishedAfter = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000).toISOString();
     url += `&order=date&publishedAfter=${publishedAfter}`;
@@ -90,8 +111,13 @@ async function fetchSwimVideos(
 
   const searchRes = await fetch(url);
   const searchJson = await searchRes.json();
-  const ids: string[] = (searchJson.items ?? []).map((item: any) => item.id?.videoId).filter(Boolean);
-  if (ids.length === 0) return [];
+  const items: any[] = (searchJson.items ?? []).filter((item: any) => item.id?.videoId);
+  if (items.length === 0) return [];
+  // 설명은 안전 필터링에만 쓰고 YoutubeVideo엔 안 담는다 — 화면에서 안 쓰는 데이터라서.
+  const descriptionById = new Map<string, string>(
+    items.map((item) => [item.id.videoId, item.snippet?.description ?? ''])
+  );
+  const ids = items.map((item) => item.id.videoId);
 
   const statsRes = await fetch(
     `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(',')}&key=${API_KEY}`
@@ -99,6 +125,9 @@ async function fetchSwimVideos(
   const statsJson = await statsRes.json();
 
   return (statsJson.items ?? [])
+    .filter((item: any) =>
+      !isBannedContent(item.snippet?.title ?? '', item.snippet?.channelTitle ?? '', descriptionById.get(item.id) ?? '')
+    )
     .map((item: any) => {
       // medium(320x180)은 큰 그리드/세로 썸네일에선 흐릿하게 뜬다 — 실제로 존재하는
       // 더 고화질 썸네일부터 순서대로 후보에 담고, 화면에서 하나가 깨지면 다음 걸 쓴다.
@@ -122,7 +151,8 @@ async function fetchSwimVideos(
     })
     // 썸네일이 하나도 없는 영상은 목록에서 아예 뺀다.
     .filter((v: YoutubeVideo) => v.thumbnailCandidates.length > 0)
-    .sort((a: YoutubeVideo, b: YoutubeVideo) => b.viewCount - a.viewCount);
+    // 한국 영상을 우선으로 — 제목에 한글이 있는 영상을 먼저, 그 안에서는 조회수순.
+    .sort(compareKoreanFirst);
 }
 
 // 문자열을 32비트 정수로 해시한다 (seededShuffle의 시드용 — 날짜/쿼리별로 매번 다르지만
@@ -187,7 +217,7 @@ export async function searchSwimVideos(
       ? pool
       : seededShuffle(pool, hashString(`${slotId}:${query}`))
           .slice(0, maxResults)
-          .sort((a, b) => b.viewCount - a.viewCount);
+          .sort(compareKoreanFirst);
     if (videos.length > 0) {
       await writeCache(cacheKey, { slotId, videos });
       return videos;

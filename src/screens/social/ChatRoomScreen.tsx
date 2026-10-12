@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -12,18 +14,24 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import { MembersIcon } from '../../components/icons/TabIcons';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
 import {
   ChatMessage,
   Friend,
-  ProfanityBlockedError,
+  getFriends,
+  getGroupById,
   getGroupMembers,
   getMessages,
+  inviteLinkFor,
+  inviteMemberToGroup,
   kickMember,
   leaveGroup,
+  ProfanityBlockedError,
   sendTextMessage,
   shareRecordToGroup,
   subscribeToMessages,
@@ -45,18 +53,25 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [memberModal, setMemberModal] = useState(false);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteModal, setInviteModal] = useState(false);
+  const [invitableFriends, setInvitableFriends] = useState<Friend[]>([]);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const headerHeight = useHeaderHeight();
 
   const isOwner = !!myId && myId === ownerId;
 
   const reload = useCallback(async () => {
-    const [user, memberList, messageList] = await Promise.all([
+    const [user, memberList, messageList, group] = await Promise.all([
       getCurrentUser(),
       getGroupMembers(groupId),
       getMessages(groupId),
+      getGroupById(groupId),
     ]);
     setMyId(user?.id ?? null);
     setMembers(Object.fromEntries(memberList.map((m) => [m.id, m])));
     setMessages(messageList);
+    setInviteCode(group?.inviteCode ?? null);
   }, [groupId]);
 
   useFocusEffect(
@@ -68,12 +83,43 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <TouchableOpacity onPress={() => setMemberModal(true)}>
-          <Text style={styles.headerAction}>멤버</Text>
+        <TouchableOpacity style={styles.headerAction} onPress={() => setMemberModal(true)} hitSlop={8}>
+          <MembersIcon color={colors.blueSea} size={22} />
         </TouchableOpacity>
       ),
     });
   }, [navigation]);
+
+  async function openInviteModal() {
+    const friends = await getFriends();
+    const memberIds = new Set(Object.keys(members));
+    setInvitableFriends(friends.filter((f) => !memberIds.has(f.id)));
+    setInviteModal(true);
+  }
+
+  async function handleInviteFriend(friend: Friend) {
+    setInvitingId(friend.id);
+    try {
+      await inviteMemberToGroup(groupId, friend.id);
+      setInvitableFriends((prev) => prev.filter((f) => f.id !== friend.id));
+      await reload();
+    } catch (e: any) {
+      if (e?.message?.includes('banned_from_group')) {
+        Alert.alert('초대 불가', '강퇴된 적이 있어서 다시 초대할 수 없어요.');
+      } else {
+        Alert.alert('초대 실패', '잠시 후 다시 시도해주세요.');
+      }
+    } finally {
+      setInvitingId(null);
+    }
+  }
+
+  function handleShareInviteLink() {
+    if (!inviteCode) return;
+    Share.share({
+      message: `둥실 ${roomLabel}방 "${groupName}"에 초대할게요!\n${inviteLinkFor(inviteCode)}\n초대 코드: ${inviteCode}`,
+    });
+  }
 
   useEffect(() => {
     const unsubscribe = subscribeToMessages(groupId, (message) => {
@@ -171,12 +217,14 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{groupName}</Text>
         </View>
 
         <FlatList
+          style={styles.flex}
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
@@ -253,10 +301,59 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
                 </View>
               )}
             />
+            <View style={styles.inviteRow}>
+              <TouchableOpacity
+                style={styles.inviteActionBtn}
+                onPress={() => {
+                  setMemberModal(false);
+                  openInviteModal();
+                }}
+              >
+                <Text style={styles.inviteActionBtnText}>+ 수친 추가</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.inviteActionBtn} onPress={handleShareInviteLink}>
+                <Text style={styles.inviteActionBtnText}>초대 링크 보내기</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave}>
               <Text style={styles.leaveBtnText}>{roomLabel}방 나가기</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.modalClose} onPress={() => setMemberModal(false)}>
+              <Text style={styles.modalCloseText}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={inviteModal} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>수친 초대</Text>
+            <FlatList
+              data={invitableFriends}
+              keyExtractor={(f) => f.id}
+              style={styles.memberList}
+              renderItem={({ item }) => (
+                <View style={styles.memberRow}>
+                  <Text style={styles.memberName}>{item.nicknameKo}</Text>
+                  <TouchableOpacity
+                    style={styles.inviteFriendBtn}
+                    onPress={() => handleInviteFriend(item)}
+                    disabled={invitingId === item.id}
+                  >
+                    {invitingId === item.id ? (
+                      <ActivityIndicator color={colors.white} size="small" />
+                    ) : (
+                      <Text style={styles.inviteFriendBtnText}>초대</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.empty}>초대할 수 있는 수친이 없어요 (이미 다 들어와 있어요).</Text>
+              }
+            />
+            <TouchableOpacity style={styles.modalClose} onPress={() => setInviteModal(false)}>
               <Text style={styles.modalCloseText}>닫기</Text>
             </TouchableOpacity>
           </View>
@@ -270,7 +367,13 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   headerTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
-  headerAction: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 14, marginRight: spacing.sm },
+  headerAction: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+    marginRight: spacing.hairline,
+  },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.hairline },
   bubbleRow: { marginBottom: spacing.hairline, alignItems: 'flex-start' },
   bubbleRowMine: { alignItems: 'flex-end' },
@@ -347,6 +450,24 @@ const styles = StyleSheet.create({
   memberActions: { flexDirection: 'row', gap: spacing.sm },
   memberActionText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   memberActionTextDanger: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },
+  inviteRow: { flexDirection: 'row', gap: spacing.hairline, marginTop: spacing.sm },
+  inviteActionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.hairline + 4,
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.pill,
+  },
+  inviteActionBtnText: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 13 },
+  inviteFriendBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    minWidth: 52,
+    alignItems: 'center',
+  },
+  inviteFriendBtnText: { fontFamily: fonts.semibold, color: colors.white, fontSize: 12 },
   leaveBtn: { alignItems: 'center', paddingVertical: spacing.xs, marginTop: spacing.sm },
   leaveBtnText: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 13 },
   modalClose: { alignItems: 'center', paddingVertical: spacing.hairline + 4 },

@@ -33,12 +33,15 @@ export interface UserProfile {
   isAdmin: boolean;
   /** 수영을 시작한 날짜(YYYY-MM-DD). 수력 계산에 쓴다. */
   swimSince: string | null;
+  /** E.164 형식(+8210...)으로 등록된 내 전화번호. 등록해야 다른 사람이 연락처로 나를
+   * 찾을 수 있다(그 반대도 마찬가지). null이면 아직 등록 안 한 것. */
+  phoneE164: string | null;
 }
 
 async function fetchOrCreateProfile(userId: string, fallbackName: string): Promise<UserProfile> {
   const { data: existing } = await supabase
     .from('profiles')
-    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since')
+    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since, phone_e164')
     .eq('id', userId)
     .maybeSingle();
 
@@ -52,6 +55,7 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
       contactsSynced: false,
       isAdmin: existing.is_admin ?? false,
       swimSince: existing.swim_since ?? null,
+      phoneE164: existing.phone_e164 ?? null,
     };
   }
 
@@ -66,7 +70,7 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
       nickname_en: fallbackName,
       invite_code: inviteCode,
     })
-    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since')
+    .select('id, nickname_ko, nickname_en, invite_code, is_admin, swim_since, phone_e164')
     .single();
 
   if (error || !inserted) {
@@ -81,6 +85,7 @@ async function fetchOrCreateProfile(userId: string, fallbackName: string): Promi
     provider: 'apple',
     contactsSynced: false,
     isAdmin: inserted.is_admin ?? false,
+    phoneE164: inserted.phone_e164 ?? null,
     swimSince: inserted.swim_since ?? null,
   };
 }
@@ -104,6 +109,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
           contactsSynced: false,
           isAdmin: false,
           swimSince: null,
+          phoneE164: null,
         };
       }
     }
@@ -147,6 +153,7 @@ export async function signInWithApple(): Promise<UserProfile> {
       contactsSynced: false,
       isAdmin: false,
       swimSince: null,
+      phoneE164: null,
     };
     await AsyncStorage.setItem(GUEST_KEY, JSON.stringify(profile));
     return profile;
@@ -173,9 +180,20 @@ export async function continueAsGuest(): Promise<UserProfile> {
     contactsSynced: false,
     isAdmin: false,
     swimSince: null,
+    phoneE164: null,
   };
   await AsyncStorage.setItem(GUEST_KEY, JSON.stringify(profile));
   return profile;
+}
+
+/** 내 전화번호를 등록한다 — "연락처에서 가입자 찾기"는 다른 사람 연락처에 저장된
+ * 내 번호와 내 profiles.phone_e164를 비교해서 매칭하는 방식이라, 이걸 등록해두지
+ * 않으면 아무도 나를 찾을 수 없다(반대로 내가 남을 찾는 것도 상대가 등록해야 가능). */
+export async function updatePhoneNumber(e164: string): Promise<void> {
+  const user = await getCurrentUser();
+  if (!user || user.provider !== 'apple' || !isSupabaseConfigured) return;
+  const { error } = await supabase.from('profiles').update({ phone_e164: e164 }).eq('id', user.id);
+  if (error) throw error;
 }
 
 export async function updateNicknames(nicknameKo: string, nicknameEn: string): Promise<void> {

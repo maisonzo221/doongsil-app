@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as Contacts from 'expo-contacts';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
@@ -132,6 +133,26 @@ export default function FriendsScreen({ navigation, route }: Props) {
   }, [route.params?.code, navigation]);
 
   const disabled = !me || me.provider !== 'apple';
+  const [contactsPermissionGranted, setContactsPermissionGranted] = useState(false);
+
+  // 수친 추가 모달을 열 때마다, 연락처 접근 권한이 이미 허용돼 있으면 버튼을 또
+  // 누르게 하지 않고 바로 목록을 보여준다 — 권한이 없을 때만 아래 버튼으로 요청한다.
+  useEffect(() => {
+    if (!addModal) return;
+    (async () => {
+      const { status } = await Contacts.getPermissionsAsync();
+      const granted = status === 'granted';
+      setContactsPermissionGranted(granted);
+      if (granted) {
+        setLoadingContacts(true);
+        try {
+          setMatched(await findRegisteredContacts());
+        } finally {
+          setLoadingContacts(false);
+        }
+      }
+    })();
+  }, [addModal]);
 
   async function handleFindContacts() {
     setLoadingContacts(true);
@@ -141,6 +162,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
         Alert.alert('연락처 접근 필요', '설정에서 연락처 접근을 허용해주세요.');
         return;
       }
+      setContactsPermissionGranted(true);
       const results = await findRegisteredContacts();
       setMatched(results);
     } finally {
@@ -158,24 +180,32 @@ export default function FriendsScreen({ navigation, route }: Props) {
   }
 
   async function handleAddSelected() {
-    await Promise.all(Array.from(selected).map((id) => addFriendById(id)));
-    setSelected(new Set());
-    setMatched([]);
-    setAddModal(false);
-    await reload();
+    try {
+      await Promise.all(Array.from(selected).map((id) => addFriendById(id)));
+      setSelected(new Set());
+      setMatched([]);
+      setAddModal(false);
+      await reload();
+    } catch {
+      Alert.alert('추가 실패', '잠시 후 다시 시도해주세요.');
+    }
   }
 
   async function handleAddByCode() {
     if (!inviteCodeDraft.trim()) return;
-    const result = await addFriendByInviteCode(inviteCodeDraft.trim());
-    if (!result.ok) {
-      Alert.alert('추가 실패', '가입 코드를 다시 확인해주세요.');
-      return;
+    try {
+      const result = await addFriendByInviteCode(inviteCodeDraft.trim());
+      if (!result.ok) {
+        Alert.alert('추가 실패', '가입 코드를 다시 확인해주세요.');
+        return;
+      }
+      setInviteCodeDraft('');
+      setAddModal(false);
+      await reload();
+      Alert.alert('추가 완료', `${result.nickname}님을 수친으로 추가했어요.`);
+    } catch {
+      Alert.alert('추가 실패', '잠시 후 다시 시도해주세요.');
     }
-    setInviteCodeDraft('');
-    setAddModal(false);
-    await reload();
-    Alert.alert('추가 완료', `${result.nickname}님을 수친으로 추가했어요.`);
   }
 
   async function handleSaveNicknames() {
@@ -374,14 +404,27 @@ export default function FriendsScreen({ navigation, route }: Props) {
               <Text style={styles.modalTitle}>수친 추가</Text>
 
               <Text style={styles.sectionLabel}>연락처에서 찾기</Text>
+              {loadingContacts && matched.length === 0 && (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              )}
               <TouchableOpacity style={styles.secondaryBtn} onPress={handleFindContacts}>
                 {loadingContacts ? (
                   <ActivityIndicator color={colors.primary} />
                 ) : (
-                  <Text style={styles.secondaryBtnText}>연락처에서 가입자 찾기</Text>
+                  <Text style={styles.secondaryBtnText}>
+                    {contactsPermissionGranted ? '다시 찾기' : '연락처에서 가입자 찾기'}
+                  </Text>
                 )}
               </TouchableOpacity>
 
+              {contactsPermissionGranted && !loadingContacts && matched.length === 0 && (
+                <Text style={styles.matchEmpty}>
+                  연락처 중 둥실에 가입한 사람이 아직 없어요. 상대방도 설정에서 전화번호를
+                  등록해야 찾을 수 있어요.
+                </Text>
+              )}
               {matched.map((c) => {
                 const isSelected = selected.has(c.id);
                 return (
@@ -541,6 +584,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   secondaryBtnText: { fontFamily: fonts.semibold, color: colors.primary },
+  loadingRow: { alignItems: 'center', paddingVertical: spacing.sm },
+  matchEmpty: {
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
   matchRow: {
     flexDirection: 'row',
     alignItems: 'center',

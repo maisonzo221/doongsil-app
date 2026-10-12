@@ -13,9 +13,17 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
-import { deleteAccount, getCurrentUser, signOut, updateSwimSince, UserProfile } from '../../storage/auth';
+import {
+  deleteAccount,
+  getCurrentUser,
+  signOut,
+  updatePhoneNumber,
+  updateSwimSince,
+  UserProfile,
+} from '../../storage/auth';
 import { PRIVACY_POLICY_URL } from '../../config/links';
 import { swimTenureLabel } from '../../utils/swimTenure';
+import { toE164 } from '../../utils/phone';
 
 type Props = NativeStackScreenProps<FriendsStackParamList, 'Settings'>;
 
@@ -27,6 +35,9 @@ export default function SettingsScreen({}: Props) {
   const [tenureMonth, setTenureMonth] = useState('');
   const [tenureDay, setTenureDay] = useState('');
   const [savingTenure, setSavingTenure] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneDraft, setPhoneDraft] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then((user) => {
@@ -60,6 +71,24 @@ export default function SettingsScreen({}: Props) {
       Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
     } finally {
       setSavingTenure(false);
+    }
+  }
+
+  async function handleSavePhone() {
+    const e164 = toE164(phoneDraft);
+    if (!e164 || e164.length < 8) {
+      Alert.alert('번호 확인', '전화번호를 다시 확인해주세요.');
+      return;
+    }
+    setSavingPhone(true);
+    try {
+      await updatePhoneNumber(e164);
+      setMe((prev) => (prev ? { ...prev, phoneE164: e164 } : prev));
+      setEditingPhone(false);
+    } catch {
+      Alert.alert('저장 실패', '이미 등록된 번호이거나, 잠시 후 다시 시도해주세요.');
+    } finally {
+      setSavingPhone(false);
     }
   }
 
@@ -158,6 +187,41 @@ export default function SettingsScreen({}: Props) {
                 </Text>
               </TouchableOpacity>
             )}
+
+            <Text style={[styles.cardLabel, { marginTop: spacing.sm }]}>전화번호</Text>
+            <Text style={styles.helperText}>
+              등록해야 다른 사람이 연락처로 나를 찾을 수 있어요 (수친 찾기용).
+            </Text>
+            {editingPhone ? (
+              <View>
+                <TextInput
+                  style={styles.input}
+                  value={phoneDraft}
+                  onChangeText={setPhoneDraft}
+                  placeholder="010-1234-5678"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="phone-pad"
+                />
+                <TouchableOpacity style={styles.tenureSaveBtn} onPress={handleSavePhone} disabled={savingPhone}>
+                  {savingPhone ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.tenureSaveBtnText}>저장</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  setPhoneDraft(me.phoneE164 ?? '');
+                  setEditingPhone(true);
+                }}
+              >
+                <Text style={styles.cardValue}>
+                  {me.phoneE164 ?? '미등록'} {me.phoneE164 ? '· 수정' : '· 등록하기'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -221,4 +285,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   tenureSaveBtnText: { fontFamily: fonts.semibold, color: colors.white, fontSize: 13 },
+  helperText: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 11, marginTop: 1, marginBottom: 4 },
+  input: {
+    backgroundColor: colors.cardSoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 8,
+    fontFamily: fonts.regular,
+    color: colors.text,
+    marginTop: 2,
+  },
 });

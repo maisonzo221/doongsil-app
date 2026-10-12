@@ -55,6 +55,28 @@ export function FriendsIcon({ color, size }: IconProps) {
   );
 }
 
+// 수톡/톡톡 방 안의 "멤버" 버튼용 — 사람 두 명이 겹쳐있는 모양으로 "구성원"을 나타낸다.
+export function MembersIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Circle cx="8.3" cy="8.6" r="2.6" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path
+        d="M3.3 19c0-3.1 2.3-5.3 5-5.3.9 0 1.8.25 2.5.72"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinecap="round"
+      />
+      <Circle cx="15.1" cy="8.2" r="3" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path
+        d="M9.2 19.2c0-3.3 2.6-5.7 5.9-5.7s5.9 2.4 5.9 5.7"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinecap="round"
+      />
+    </Base>
+  );
+}
+
 export function GroupsIcon({ color, size }: IconProps) {
   return (
     <Base size={size}>

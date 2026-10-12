@@ -125,7 +125,11 @@ export async function findRegisteredContacts(): Promise<MatchedContact[]> {
 }
 
 export async function addFriendById(targetId: string): Promise<void> {
-  await supabase.rpc('add_mutual_friend', { target_id: targetId });
+  // 전엔 이 호출이 실패해도(RPC 에러) 조용히 넘어가서, 화면에선 "추가 완료"라고 뜨는데
+  // 실제론 friendships에 아무것도 안 쌓이는 버그가 있었다 — 반드시 에러를 던져서
+  // 호출하는 쪽에서 진짜 실패를 알 수 있게 한다.
+  const { error } = await supabase.rpc('add_mutual_friend', { target_id: targetId });
+  if (error) throw error;
 }
 
 export async function addFriendByInviteCode(
@@ -176,6 +180,15 @@ export async function getGroupById(id: string): Promise<ChatGroup | null> {
     ownerId: data.owner_id,
     roomKind: data.room_kind,
   };
+}
+
+/** 이미 방에 있는 사람이 수친을 바로 멤버로 초대한다 (초대 코드 입력 없이). */
+export async function inviteMemberToGroup(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('invite_member_to_group', {
+    target_group_id: groupId,
+    target_user_id: userId,
+  });
+  if (error) throw error;
 }
 
 /** 방장이 멤버를 강퇴한다. 강퇴된 사람은 같은 초대 코드로 다시 못 들어온다. */
