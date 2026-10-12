@@ -12,6 +12,7 @@ export interface BoardPost {
   category: string;
   title: string;
   body: string;
+  imageUrl?: string;
   createdAt: string;
 }
 
@@ -61,7 +62,7 @@ function postAuthorName(row: any): string {
 export async function getBoardPosts(): Promise<BoardPost[]> {
   const { data, error } = await supabase
     .from('board_posts')
-    .select('id, author_id, category, title, body, created_at, profiles(nickname_ko, nickname_en)')
+    .select('id, author_id, category, title, body, image_url, created_at, profiles(nickname_ko, nickname_en)')
     .order('created_at', { ascending: false });
   if (error || !data) return [];
   return (data as any[]).map((row) => ({
@@ -71,6 +72,7 @@ export async function getBoardPosts(): Promise<BoardPost[]> {
     category: row.category,
     title: row.title,
     body: row.body,
+    imageUrl: row.image_url ?? undefined,
     createdAt: row.created_at,
   }));
 }

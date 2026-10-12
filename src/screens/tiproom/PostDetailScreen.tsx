@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -120,6 +121,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             </TouchableOpacity>
             <Text style={styles.meta}> · {timeAgo(post.createdAt)}</Text>
           </View>
+          {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.postImage} />}
           <Text style={styles.body}>{post.body}</Text>
 
           {canDelete && (
@@ -172,6 +174,13 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   metaAuthor: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   meta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12 },
+  postImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.md,
+    marginTop: spacing.sm,
+    backgroundColor: colors.cardSoft,
+  },
   body: { fontFamily: fonts.regular, color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   deleteBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
   deleteBtnText: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Linking,
   Modal,
   ScrollView,
@@ -199,6 +200,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 <View style={styles.categoryBadge}>
                   <Text style={styles.categoryBadgeText}>{p.category}</Text>
                 </View>
+                {p.imageUrl && <Image source={{ uri: p.imageUrl }} style={styles.postImage} />}
                 <Text style={styles.postTitle}>{p.title}</Text>
                 <Text style={styles.postMeta}>
                   {p.authorNickname} · {timeAgo(p.createdAt)}
@@ -618,6 +620,13 @@ const styles = StyleSheet.create({
   postCard: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.hairline + 4 },
   categoryBadge: { alignSelf: 'flex-start', backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingHorizontal: spacing.hairline + 2, paddingVertical: 2, marginBottom: 4 },
   categoryBadgeText: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 10 },
+  postImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: radius.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.cardSoft,
+  },
   postTitle: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
   postMeta: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginTop: 2 },
   searchInput: {
