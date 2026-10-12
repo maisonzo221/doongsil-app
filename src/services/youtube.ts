@@ -47,6 +47,24 @@ export function currentSlotId(now: Date = new Date()): string {
   return slotStart.toISOString();
 }
 
+/** "요즘 인기 수영 영상" 섹션 전용 — 하루를 새벽 6시/오후 3시/저녁 8시 세 구간으로
+ * 나눠서, 그 세 시각마다 새로 받아온다(같은 2슬롯짜리 currentSlotId보다 더 자주 바뀜). */
+export function currentTripleSlotId(now: Date = new Date()): string {
+  const slotStart = new Date(now);
+  const hour = now.getHours();
+  if (hour >= 20) {
+    slotStart.setHours(20, 0, 0, 0);
+  } else if (hour >= 15) {
+    slotStart.setHours(15, 0, 0, 0);
+  } else if (hour >= 6) {
+    slotStart.setHours(6, 0, 0, 0);
+  } else {
+    slotStart.setDate(slotStart.getDate() - 1);
+    slotStart.setHours(20, 0, 0, 0);
+  }
+  return slotStart.toISOString();
+}
+
 interface CachedEntry {
   slotId: string;
   videos: YoutubeVideo[];
@@ -223,6 +241,34 @@ export async function searchSwimVideos(
       return videos;
     }
     // 빈 결과(쿼터 초과/네트워크 문제 등)면 오래된 캐시라도 있으면 그걸로 버틴다.
+    return cached?.videos ?? [];
+  } catch {
+    return cached?.videos ?? [];
+  }
+}
+
+const POPULAR_QUERY = '수영';
+
+/** "요즘 인기 수영 영상" 섹션(2열 5줄, 10개)용. "수영"으로 넓게 검색해서 후보 자체가
+ * 많기 때문에, 자유형/턴 같은 좁은 카테고리와 달리 매번 진짜 다르게 보인다 — 새벽6시/
+ * 오후3시/저녁8시 세 번만 새로 받아오고, 그 안에서는 조회수 높은 순(한국 영상 우선)
+ * 으로 고정해서 보여준다. */
+export async function searchPopularSwimVideos(maxResults = 10): Promise<YoutubeVideo[]> {
+  if (!API_KEY) return [];
+
+  const cacheKey = `${CACHE_PREFIX}popular:${maxResults}`;
+  const slotId = currentTripleSlotId();
+  const cached = await readCache(cacheKey);
+  if (cached && cached.slotId === slotId) {
+    return cached.videos;
+  }
+
+  try {
+    const videos = await fetchSwimVideos(POPULAR_QUERY, maxResults, undefined);
+    if (videos.length > 0) {
+      await writeCache(cacheKey, { slotId, videos });
+      return videos;
+    }
     return cached?.videos ?? [];
   } catch {
     return cached?.videos ?? [];

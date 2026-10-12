@@ -18,6 +18,7 @@ import { colors, fonts, radius, spacing } from '../theme';
 import {
   formatViewCount,
   isYoutubeConfigured,
+  searchPopularSwimVideos,
   searchSwimVideos,
   searchTrendingShorts,
   youtubeWatchUrl,
@@ -165,6 +166,30 @@ export default function TeachingScreen() {
 
   const visibleTopVideos = topVideos.filter((v) => !topBrokenIds.has(v.id));
 
+  const [popularVideos, setPopularVideos] = useState<YoutubeVideo[]>([]);
+  const [loadingPopular, setLoadingPopular] = useState(true);
+  const [popularBrokenIds, setPopularBrokenIds] = useState<Set<string>>(new Set());
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      // "수영"으로 넓게 검색해서 후보가 많으니, 좁은 카테고리들과 달리 새벽6시/
+      // 오후3시/저녁8시 세 번 다 실제로 다른 영상이 뜬다.
+      searchPopularSwimVideos(10).then((v) => {
+        if (!cancelled) {
+          setPopularVideos(v);
+          setPopularBrokenIds(new Set());
+          setLoadingPopular(false);
+        }
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  const visiblePopularVideos = popularVideos.filter((v) => !popularBrokenIds.has(v.id));
+
   if (!isYoutubeConfigured) {
     return (
       <ComingSoonScreen
@@ -193,6 +218,23 @@ export default function TeachingScreen() {
                 vertical
                 onPress={() => openInYoutube(v.id)}
                 onBroken={(id) => setTopBrokenIds((prev) => new Set(prev).add(id))}
+              />
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.topTitle}>요즘 인기 수영 영상</Text>
+        {loadingPopular ? (
+          <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
+        ) : (
+          <View style={styles.topGrid}>
+            {visiblePopularVideos.slice(0, 10).map((v) => (
+              <VideoThumb
+                key={v.id}
+                video={v}
+                style={styles.topThumb}
+                onPress={() => openInYoutube(v.id)}
+                onBroken={(id) => setPopularBrokenIds((prev) => new Set(prev).add(id))}
               />
             ))}
           </View>
