@@ -59,6 +59,12 @@
           "icon": "./assets/icon.png",
           "color": "#0EA894"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "내 주변 수영장을 지도에 바로 보여드리기 위해 위치 접근을 허용해주세요."
+        }
       ]
     ],
     "extra": {

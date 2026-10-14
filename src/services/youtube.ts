@@ -116,7 +116,8 @@ function compareKoreanFirst(a: YoutubeVideo, b: YoutubeVideo): number {
 async function fetchSwimVideos(
   query: string,
   maxResults: number,
-  recentDays?: number
+  recentDays?: number,
+  videoDuration?: 'short'
 ): Promise<YoutubeVideo[]> {
   let url =
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}` +
@@ -125,6 +126,11 @@ async function fetchSwimVideos(
   if (recentDays) {
     const publishedAfter = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000).toISOString();
     url += `&order=date&publishedAfter=${publishedAfter}`;
+  }
+  // 'shorts'라는 글자가 제목/쿼리에 있는지로 판단하는 대신, 유튜브 API가 실제로 보고하는
+  // 영상 길이(4분 이하)로 걸러야 진짜 쇼츠만 뜬다.
+  if (videoDuration) {
+    url += `&videoDuration=${videoDuration}`;
   }
 
   const searchRes = await fetch(url);
@@ -275,21 +281,11 @@ export async function searchPopularSwimVideos(maxResults = 10): Promise<YoutubeV
   }
 }
 
-const TRENDING_QUERY = '수영 팁 shorts';
-// 최근 업로드만으로는 개수가 모자랄 때 채워 넣을 다른 수영 주제들 — 매번 그 중 하나를
-// 무작위로 골라서, 모자란 칸을 "오늘은 자유형, 내일은 배영" 식으로 다르게 채운다.
-const TRENDING_FALLBACK_TOPICS = [
-  '수영 자유형 꿀팁',
-  '수영 배영 연습',
-  '수영 평영 기초',
-  '수영 접영 연습',
-  '수영 호흡법',
-  '수영 다이어트',
-];
-
-/** "오늘의 인기 쇼츠"용. 최근 14일 업로드로 먼저 채우고, 그걸로 개수가 모자라면
- * 수영 주제 중 하나를 무작위로 골라 전체 기간에서 보충한다 — 그래서 최근 쇼츠가
- * 적은 날에도 칸이 비지 않고, 항상 실제 수영 영상으로만 채워진다. */
+/** "오늘의 인기 쇼츠"용. "수영 팁 shorts"처럼 좁은 검색어 대신 "요즘 인기 수영 영상"과
+ * 똑같이 넓은 "수영"으로 검색해서 후보 풀 자체를 키운다 — 좁은 검색어는 최근 14일
+ * 업로드가 며칠째 그대로라 매번 똑같은 영상만 떴었다. "shorts"라는 글자로 판단하는 대신
+ * videoDuration=short(4분 이하) API 필터로 걸러서 진짜 쇼츠만 모은다. 풀을 넉넉히
+ * 받아와서 슬롯(날짜)마다 그 안에서 다른 부분집합을 보여준다. */
 export async function searchTrendingShorts(maxResults = 4): Promise<YoutubeVideo[]> {
   if (!API_KEY) return [];
 
@@ -301,24 +297,19 @@ export async function searchTrendingShorts(maxResults = 4): Promise<YoutubeVideo
   }
 
   try {
-    const recent = await fetchSwimVideos(TRENDING_QUERY, maxResults * 2, 14);
-    const videos = [...recent];
-    const seenIds = new Set(videos.map((v) => v.id));
+    const recent = await fetchSwimVideos(POPULAR_QUERY, Math.max(maxResults * 4, 20), 14, 'short');
+    let pool = recent;
 
-    if (videos.length < maxResults) {
-      const fallbackQuery =
-        TRENDING_FALLBACK_TOPICS[Math.floor(Math.random() * TRENDING_FALLBACK_TOPICS.length)];
-      const fallback = await fetchSwimVideos(fallbackQuery, maxResults * 2);
-      for (const v of fallback) {
-        if (videos.length >= maxResults) break;
-        if (!seenIds.has(v.id)) {
-          videos.push(v);
-          seenIds.add(v.id);
-        }
-      }
+    if (pool.length < maxResults) {
+      // 최근 14일 쇼츠만으로 모자라면 기간 제한 없이 같은 쿼리로 보충한다.
+      const fallback = await fetchSwimVideos(POPULAR_QUERY, Math.max(maxResults * 4, 20), undefined, 'short');
+      const seenIds = new Set(pool.map((v) => v.id));
+      pool = [...pool, ...fallback.filter((v) => !seenIds.has(v.id))];
     }
 
-    const final = videos.slice(0, maxResults);
+    const final = seededShuffle(pool, hashString(`${slotId}:trending`))
+      .slice(0, maxResults)
+      .sort(compareKoreanFirst);
     if (final.length > 0) {
       await writeCache(cacheKey, { slotId, videos: final });
       return final;

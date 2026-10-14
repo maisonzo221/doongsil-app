@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -89,28 +89,14 @@ function VideoThumb({
   );
 }
 
-function CategoryRow({ title, query }: { title: string; query: string }) {
-  const [videos, setVideos] = useState<YoutubeVideo[]>([]);
-  const [loading, setLoading] = useState(true);
+// 데이터는 부모(TeachingScreen)가 전부 받아와서 섹션 간 중복 영상을 걸러낸 뒤 내려준다 —
+// 이 컴포넌트는 깨진 썸네일만 자체적으로 관리하고, 받은 videos를 그대로 보여주기만 한다.
+function CategoryRow({ title, videos, loading }: { title: string; videos: YoutubeVideo[]; loading: boolean }) {
   const [brokenIds, setBrokenIds] = useState<Set<string>>(new Set());
 
-  // 탭에 다시 들어올 때마다 다시 확인한다 — 같은 슬롯(아침6시~저녁6시 등) 안이면
-  // 캐시된 결과가 바로 돌아오고, 슬롯이 바뀌었으면 실제로 새로 검색한다.
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      searchSwimVideos(query, 6).then((v) => {
-        if (!cancelled) {
-          setVideos(v);
-          setBrokenIds(new Set());
-          setLoading(false);
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [query])
-  );
+  useEffect(() => {
+    setBrokenIds(new Set());
+  }, [videos]);
 
   const visibleVideos = videos.filter((v) => !brokenIds.has(v.id));
   if (!loading && visibleVideos.length === 0) return null;
@@ -164,8 +150,6 @@ export default function TeachingScreen() {
     }, [])
   );
 
-  const visibleTopVideos = topVideos.filter((v) => !topBrokenIds.has(v.id));
-
   const [popularVideos, setPopularVideos] = useState<YoutubeVideo[]>([]);
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [popularBrokenIds, setPopularBrokenIds] = useState<Set<string>>(new Set());
@@ -188,7 +172,51 @@ export default function TeachingScreen() {
     }, [])
   );
 
-  const visiblePopularVideos = popularVideos.filter((v) => !popularBrokenIds.has(v.id));
+  const visibleTopVideos = useMemo(() => topVideos.filter((v) => !topBrokenIds.has(v.id)), [topVideos, topBrokenIds]);
+
+  // "오늘의 인기 쇼츠"에 이미 뜬 영상은 "요즘 인기 수영 영상"에서 한 번 더 겹쳐 뜨지
+  // 않게 뺀다 — 둘 다 넓은 "수영" 검색이라 같은 영상이 섞여 들어올 수 있다.
+  const dedupedPopular = useMemo(() => {
+    const topIds = new Set(visibleTopVideos.map((v) => v.id));
+    return popularVideos.filter((v) => !popularBrokenIds.has(v.id) && !topIds.has(v.id));
+  }, [popularVideos, popularBrokenIds, visibleTopVideos]);
+
+  const [categoryRaw, setCategoryRaw] = useState<Record<string, YoutubeVideo[]>>({});
+  const [loadingCategories, setLoadingCategories] = useState(true);
+
+  // 카테고리들을 여기서 한꺼번에 받아와야, 위 두 섹션이랑 겹치는 영상을 걸러낼 수 있다
+  // (각 카테고리가 따로 알아서 받아오면 서로 뭘 보여주는지 몰라서 중복을 못 막는다).
+  // 중복 제거로 몇 개가 빠질 수 있으니 필요한 개수(6개)보다 넉넉히 받아온다.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      Promise.all(CATEGORIES.map((c) => searchSwimVideos(c.query, 10))).then((results) => {
+        if (cancelled) return;
+        const byQuery: Record<string, YoutubeVideo[]> = {};
+        CATEGORIES.forEach((c, i) => {
+          byQuery[c.query] = results[i];
+        });
+        setCategoryRaw(byQuery);
+        setLoadingCategories(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  // 위 두 섹션(쇼츠/인기 영상) + 앞 카테고리들에서 이미 쓴 영상은 뒤 카테고리에서 뺀다.
+  const dedupedCategories = useMemo(() => {
+    const usedIds = new Set([...visibleTopVideos, ...dedupedPopular].map((v) => v.id));
+    const result: Record<string, YoutubeVideo[]> = {};
+    for (const c of CATEGORIES) {
+      const unique = (categoryRaw[c.query] ?? []).filter((v) => !usedIds.has(v.id));
+      const final = unique.slice(0, 6);
+      final.forEach((v) => usedIds.add(v.id));
+      result[c.query] = final;
+    }
+    return result;
+  }, [categoryRaw, visibleTopVideos, dedupedPopular]);
 
   if (!isYoutubeConfigured) {
     return (
@@ -228,7 +256,7 @@ export default function TeachingScreen() {
           <ActivityIndicator color={colors.primary} style={styles.categoryLoading} />
         ) : (
           <View style={styles.topGrid}>
-            {visiblePopularVideos.slice(0, 10).map((v) => (
+            {dedupedPopular.slice(0, 10).map((v) => (
               <VideoThumb
                 key={v.id}
                 video={v}
@@ -241,7 +269,12 @@ export default function TeachingScreen() {
         )}
 
         {CATEGORIES.map((c) => (
-          <CategoryRow key={c.title} title={c.title} query={c.query} />
+          <CategoryRow
+            key={c.title}
+            title={c.title}
+            videos={dedupedCategories[c.query] ?? []}
+            loading={loadingCategories}
+          />
         ))}
       </ScrollView>
     </ScreenBackground>

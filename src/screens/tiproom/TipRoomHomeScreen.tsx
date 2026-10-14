@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import PoolMapView, { isNaverMapConfigured } from '../../components/PoolMapView';
@@ -67,6 +68,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   // 이미 선택된 카드를 또 눌러도(특히 첫 번째 카드는 처음부터 선택돼 있어서 id가 안 바뀜)
   // 지도가 다시 그쪽으로 이동하도록, 탭할 때마다 값을 바꿔서 PoolMapView에 넘긴다.
@@ -79,11 +81,32 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const freeSwimCarouselRef = useRef<FlatList<OfficialPool>>(null);
   const freeSwimPools = useMemo(() => getFreeSwimPools(freeSwimSearch), [freeSwimSearch]);
 
+  // 수영장 찾기 탭에 처음 들어왔을 때 지도 중심을 내 현재 위치로 잡기 위해 GPS를 한 번 받아온다.
+  // 권한을 거부했거나 위치를 못 가져와도 기존 기본 목록으로 조용히 대체된다.
+  useEffect(() => {
+    if (tab !== 'pools' || userLocation) return;
+    let cancelled = false;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (!cancelled) setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      } catch {
+        // 위치를 못 가져와도 기본 목록으로 계속 진행한다.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, userLocation]);
+
   useEffect(() => {
     if (tab !== 'pools') return;
     if (!poolSearch.trim()) {
       // 검색 전에도 지도가 켜져있어야 하므로, 기본 수영장 목록으로 미리 채워둔다.
-      setOfficialPools(getDefaultOfficialPools());
+      // GPS 위치를 받아오면(비동기) 거리순으로 다시 정렬돼서 자동으로 업데이트된다.
+      setOfficialPools(getDefaultOfficialPools(30, userLocation ?? undefined));
       return;
     }
     let cancelled = false;
@@ -100,7 +123,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [tab, poolSearch]);
+  }, [tab, poolSearch, userLocation]);
 
   useEffect(() => {
     setSelectedPoolId(officialPools.length > 0 ? officialPools[0].id : null);
@@ -217,6 +240,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 selectedId={selectedPoolId}
                 selectToken={poolSelectToken}
                 onSelectPool={selectPool}
+                userLocation={userLocation}
               />
             ) : (
               <View style={styles.mapPlaceholder}>

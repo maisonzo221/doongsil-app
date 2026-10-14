@@ -16,6 +16,9 @@ interface Props {
   selectToken?: number;
   /** 지도 위 핀을 직접 탭했을 때 호출된다 — 하단 카드 캐러셀을 그 카드로 스크롤/선택시키는 용도. */
   onSelectPool?: (id: string) => void;
+  /** GPS로 얻은 사용자 현재 위치 — 아직 선택된 수영장이 없을 때 지도 초기 중심으로 쓰고,
+   * 파란 점으로 내 위치도 같이 표시한다. */
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 const NAVER_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID;
@@ -29,8 +32,13 @@ export const isNaverMapConfigured = !!NAVER_CLIENT_ID;
 // 네이버지도 JS SDK를 WebView 안에서 그대로 불러와 쓴다 — 헬로스윔(안녕,수영)이 쓰는
 // 것과 동일한 지도라, 도로/건물 스타일이 똑같이 나온다. Client ID는 NCP Maps 콘솔의
 // Application 등록 후 발급받은 값.
-function mapHtml(points: { id: string; name: string; addr: string; lat: number; lng: number }[]): string {
-  const center = points.length ? points[0] : { lat: 37.5665, lng: 126.978 };
+function mapHtml(
+  points: { id: string; name: string; addr: string; lat: number; lng: number }[],
+  userLoc?: { lat: number; lng: number } | null
+): string {
+  // 선택된 수영장이 아직 없으면 GPS 현재 위치를 중심으로 잡는다 — 위치 권한이 없거나
+  // 아직 못 받아왔으면 기존대로 첫 번째 결과(또는 서울시청)를 기준으로 삼는다.
+  const center = userLoc ?? (points.length ? points[0] : { lat: 37.5665, lng: 126.978 });
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -56,6 +64,21 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
     center: new naver.maps.LatLng(${center.lat}, ${center.lng}),
     zoom: ${points.length > 1 ? 11 : 15}
   });
+
+  ${
+    userLoc
+      ? `new naver.maps.Marker({
+    position: new naver.maps.LatLng(${userLoc.lat}, ${userLoc.lng}),
+    map: map,
+    icon: {
+      content: '<div style="width:16px;height:16px;border-radius:8px;background:#2F7BF5;border:3px solid #ffffff;box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>',
+      size: new naver.maps.Size(16, 16),
+      anchor: new naver.maps.Point(8, 8)
+    },
+    zIndex: 0
+  });`
+      : ''
+  }
 
   const bounds = new naver.maps.LatLngBounds();
   points.forEach(function (p) {
@@ -136,7 +159,7 @@ function mapHtml(points: { id: string; name: string; addr: string; lat: number; 
 </html>`;
 }
 
-export default function PoolMapView({ pools, fill, selectedId, selectToken, onSelectPool }: Props) {
+export default function PoolMapView({ pools, fill, selectedId, selectToken, onSelectPool, userLocation }: Props) {
   const webviewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const points = useMemo(
@@ -146,7 +169,7 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
         .map((p) => ({ id: p.id, name: p.name, addr: p.roadAddress, lat: p.lat as number, lng: p.lng as number })),
     [pools]
   );
-  const html = useMemo(() => mapHtml(points), [points]);
+  const html = useMemo(() => mapHtml(points, userLocation), [points, userLocation]);
 
   // html이 바뀌면(검색 결과가 바뀌어 지도가 통째로 다시 로드되면) WebView 안의 지도도
   // 처음부터 다시 만들어지므로, 새로 "mapReady" 신호가 올 때까지 다시 기다려야 한다.
