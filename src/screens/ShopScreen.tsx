@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.xs,
     left: spacing.xs,
-    backgroundColor: 'rgba(10,51,88,0.65)',
+    backgroundColor: 'rgba(11,42,74,0.65)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.hairline + 2,
     paddingVertical: 2,

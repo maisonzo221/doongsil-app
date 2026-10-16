@@ -6,12 +6,13 @@ import { colors, fonts, radius, spacing } from '../theme';
 
 // 실제 사진/캐릭터 애니메이션이 들어오기 전까지의 자리표시자.
 // 날짜(연중 일수)로 팔레트를 골라 매일 다른 느낌을 준다.
+// 캡션(흰 글씨)이 아래쪽에 놓이므로 아래쪽 색은 항상 진한 색이어야 글씨가 읽힌다.
 const PALETTES: readonly [string, string][] = [
-  [colors.emerald, colors.blueSea],
+  [colors.aqua, colors.primary],
+  [colors.primary, colors.deepSea],
+  ['#5BD0DD', colors.blueSea],
   [colors.blueSea, colors.deepSea],
-  ['#8FE3D8', colors.emerald],
-  [colors.deepSea, colors.blueSea],
-  ['#4FC7C0', colors.deepSea],
+  ['#2FA8C9', colors.splashBackground],
 ];
 
 const CAPTIONS = [

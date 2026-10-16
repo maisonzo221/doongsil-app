@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.emerald,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.xs,
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
   empty: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10,51,88,0.4)',
+    backgroundColor: 'rgba(11,42,74,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

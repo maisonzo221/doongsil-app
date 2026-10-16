@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   sendBtnText: { fontFamily: fonts.semibold, color: colors.white },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10,51,88,0.4)',
+    backgroundColor: 'rgba(11,42,74,0.4)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,

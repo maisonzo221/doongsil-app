@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   poolFreeSwim: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12, marginTop: 4 },
   poolActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   poolAction: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 12 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(10,51,88,0.4)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,42,74,0.4)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   modalCard: { width: '100%', backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg },
   modalCardTall: { maxHeight: '85%' },
   modalTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text, marginBottom: spacing.sm },

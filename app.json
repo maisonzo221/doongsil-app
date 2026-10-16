@@ -19,7 +19,7 @@
     "android": {
       "package": "app.doongsil",
       "adaptiveIcon": {
-        "backgroundColor": "#0A3358",
+        "backgroundColor": "#0B2A4A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -34,9 +34,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 220,
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#EAF7F6"
+          "backgroundColor": "#0B4F7C"
         }
       ],
       "expo-apple-authentication",
@@ -57,7 +57,7 @@
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#0EA894"
+          "color": "#0A78A6"
         }
       ],
       [

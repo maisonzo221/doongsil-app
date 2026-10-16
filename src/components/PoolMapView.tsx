@@ -47,9 +47,9 @@ function mapHtml(
 <style>
   html,body,#map{margin:0;padding:0;height:100%;background:${colors.background};}
   .pin-popup{font-family:-apple-system,sans-serif;padding:8px 10px;max-width:220px;}
-  .pin-popup b{font-size:14px;color:#0A3358;}
-  .pin-popup .addr{font-size:12px;color:#5F7A8C;margin-top:2px;}
-  .pin-popup a{color:#0EA894;font-weight:600;text-decoration:none;display:block;margin-top:6px;font-size:13px;}
+  .pin-popup b{font-size:14px;color:${colors.deepSea};}
+  .pin-popup .addr{font-size:12px;color:${colors.textMuted};margin-top:2px;}
+  .pin-popup a{color:${colors.primary};font-weight:600;text-decoration:none;display:block;margin-top:6px;font-size:13px;}
 </style>
 </head>
 <body>
@@ -86,7 +86,7 @@ function mapHtml(
     // 📍 모양(물방울 핀)이랑 통일 — 지도 핀도 같은 실루엣의 SVG 핀으로 그린다.
     const pinSvg =
       '<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">' +
-      '<path d="M14 0C6.3 0 0 6.5 0 14.5 0 25 14 36 14 36s14-11 14-21.5C28 6.5 21.7 0 14 0z" fill="#0EA894" stroke="#ffffff" stroke-width="2"/>' +
+      '<path d="M14 0C6.3 0 0 6.5 0 14.5 0 25 14 36 14 36s14-11 14-21.5C28 6.5 21.7 0 14 0z" fill="${colors.coral}" stroke="#ffffff" stroke-width="2"/>' +
       '<circle cx="14" cy="14.5" r="5" fill="#ffffff"/>' +
       '</svg>';
     const marker = new naver.maps.Marker({
@@ -104,7 +104,7 @@ function mapHtml(
         '<div class="addr">' + p.addr + '</div>' +
         '<a href="#" data-id="' + p.id + '">길찾기 열기</a></div>',
       borderWidth: 1,
-      borderColor: '#E4ECEA',
+      borderColor: '${colors.border}',
       backgroundColor: '#FFFFFF',
       anchorSize: new naver.maps.Size(12, 10),
       pixelOffset: new naver.maps.Point(0, -4)

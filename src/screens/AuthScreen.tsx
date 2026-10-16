@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import WaterDrop from '../components/WaterDrop';
+import BrandMark from '../components/BrandMark';
 import AppleLogo from '../components/AppleLogo';
 import { colors, fonts, radius, spacing } from '../theme';
 import { continueAsGuest, signInWithApple, syncContacts, UserProfile } from '../storage/auth';
@@ -62,13 +63,12 @@ export default function AuthScreen({ onAuthenticated }: Props) {
   }
 
   return (
-    <LinearGradient colors={[colors.emerald, colors.blueSea, colors.deepSea]} style={styles.fill}>
+    <LinearGradient colors={colors.splashGradient} style={styles.fill}>
+      <StatusBar style="light" />
       <View style={styles.content}>
         {step === 'signIn' ? (
           <>
-            <View style={styles.logoCircle}>
-              <WaterDrop color={colors.white} size={36} />
-            </View>
+            <BrandMark size={128} uid="auth" />
             <Text style={styles.wordmark}>둥실</Text>
             <Text style={styles.subtitle}>수영을 기록하는 감성 다이어리</Text>
 
@@ -79,10 +79,10 @@ export default function AuthScreen({ onAuthenticated }: Props) {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={colors.white} />
+                  <ActivityIndicator color={colors.deepSea} />
                 ) : (
                   <View style={styles.appleButtonRow}>
-                    <AppleLogo size={16} color={colors.white} />
+                    <AppleLogo size={16} color={colors.deepSea} />
                     <Text style={styles.appleButtonText}>Apple로 계속하기</Text>
                   </View>
                 )}
@@ -127,19 +127,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs,
-  },
   wordmark: {
     fontFamily: fonts.heading,
-    fontSize: 30,
+    fontSize: 34,
     color: colors.white,
+    letterSpacing: 2,
+    marginTop: spacing.xs,
   },
   subtitle: {
     fontFamily: fonts.regular,
@@ -151,13 +144,12 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: spacing.xs,
   },
+  // 어두운 배경에서 눈에 띄도록 흰 버튼 (Sign in with Apple의 흰색 스타일).
   appleButton: {
-    backgroundColor: colors.deepSea,
+    backgroundColor: colors.white,
     borderRadius: radius.pill,
     paddingVertical: spacing.sm,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
   },
   appleButtonRow: {
     flexDirection: 'row',
@@ -165,7 +157,7 @@ const styles = StyleSheet.create({
     gap: spacing.hairline,
   },
   appleButtonText: {
-    color: colors.white,
+    color: colors.deepSea,
     fontFamily: fonts.semibold,
     fontSize: 16,
   },

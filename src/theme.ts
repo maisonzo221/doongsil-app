@@ -1,26 +1,32 @@
-// Color system: emerald sea / blue sea / deep sea.
+// 둥실 브랜드 팔레트 — 바다(ocean) 블루 + 아쿠아, 포인트는 곰 고글의 코랄.
+// 글씨 위에 흰색을 얹는 primary/blueSea는 모두 WCAG AA(4.5:1) 이상이다.
 export const colors = {
-  emerald: '#0EA894', // emerald sea — primary active color
-  blueSea: '#1878B8', // blue sea — secondary/accent
-  deepSea: '#0A3358', // deep sea — pressed state, strongest text
+  aqua: '#35C3D6', // 장식용 하이라이트/그라데이션 (글씨 배경으로는 쓰지 않는다)
+  blueSea: '#0B5F8F', // 보조 강조 — 작은 글씨에 쓰는 진한 바다색
+  deepSea: '#0B2A4A', // 가장 진한 글씨/눌림 상태
+  coral: '#FF7E5F', // 브랜드 포인트 — 지도 핀/배지 등 장식용 (글씨 색으로는 대비 부족)
 
-  background: '#E3F5F1',
-  backgroundGradient: ['#E3F5F1', '#D2E8F4'] as const,
+  background: '#F1FAFB',
+  backgroundGradient: ['#F1FAFB', '#DAEEF6'] as const,
   // 티칭 탭 전용 — 깊은 바닷속 느낌의 어두운 배경.
-  deepSeaGradient: ['#0A3358', '#041A2C'] as const,
+  deepSeaGradient: ['#0B2A4A', '#04172A'] as const,
+  // 로딩/로그인 화면. splashBackground는 app.json의 네이티브 스플래시 배경색과 같아야
+  // 스플래시에서 로딩 화면으로 넘어갈 때 색이 튀지 않는다.
+  splashBackground: '#0B4F7C',
+  splashGradient: ['#0E6FA0', '#0B4F7C', '#0B2A4A'] as const,
   card: '#FFFFFF',
-  cardSoft: '#EFFBF8',
+  cardSoft: '#EAF6F9',
 
-  primary: '#0EA894',
-  primaryPressed: '#0A3358',
+  primary: '#0A78A6',
+  primaryPressed: '#0B2A4A',
   disabled: '#C7CCD2',
   disabledText: '#9AA1A8',
 
-  text: '#0A3358',
-  textMuted: '#5F7A8C',
-  border: '#D6EAE6',
+  text: '#0B2A4A',
+  textMuted: '#55707F',
+  border: '#D3E7EE',
   white: '#FFFFFF',
-  shadow: '#8FCBE0',
+  shadow: '#8CC8DC',
 
   // 애플 건강 캘린더 참고 — 활동량(주황/붉은 계열), 수영량(파란 계열) 링.
   ringActivity: '#FF6B3D',
@@ -30,11 +36,11 @@ export const colors = {
 };
 
 export const moodColors: Record<string, string> = {
-  great: '#8FE3D8',
-  good: '#4FC7C0',
-  okay: '#1878B8',
-  tired: '#155F94',
-  hard: '#0A3358',
+  great: '#8DE4EC',
+  good: '#43C2D2',
+  okay: '#1A8CB8',
+  tired: '#0F6A9A',
+  hard: '#0B2A4A',
 };
 
 // 2nd (good) = wide open grin, 5th (hard) = Apple's melting face.

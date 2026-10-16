@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   recentTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 15, marginBottom: spacing.xs },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10,51,88,0.35)',
+    backgroundColor: 'rgba(11,42,74,0.35)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
