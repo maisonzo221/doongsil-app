@@ -1,5 +1,5 @@
 import React from 'react';
-import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 interface Props {
   size?: number;
@@ -13,24 +13,33 @@ export default function BrandMark({ size = 120, uid = 'bm' }: Props) {
   return (
     <Svg width={size} height={size} viewBox="0 0 240 240">
       <Defs>
-        <LinearGradient id={`bg-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#46CFE0" />
-          <Stop offset="0.55" stopColor="#0E88B4" />
-          <Stop offset="1" stopColor="#0B5F8F" />
+        <LinearGradient id={`sky-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#1B86B8" />
+          <Stop offset="1" stopColor="#58CDE0" />
         </LinearGradient>
-        <LinearGradient id={`water-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#0D6E9F" />
+        <LinearGradient id={`sea-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="114.6" x2="0" y2="240">
+          <Stop offset="0" stopColor="#2AA5C7" />
           <Stop offset="1" stopColor="#0B2A4A" />
         </LinearGradient>
-        <RadialGradient id={`fur-${uid}`} cx="0.38" cy="0.3" r="0.85">
-          <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="0.7" stopColor="#F4FBFC" />
-          <Stop offset="1" stopColor="#DDF0F4" />
-        </RadialGradient>
-        <LinearGradient id={`lens-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#EAFCFE" />
-          <Stop offset="1" stopColor="#8FE0EC" />
+        <LinearGradient id={`fade-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="114.6" x2="0" y2="184.6">
+          <Stop offset="0" stopColor="#2AA5C7" stopOpacity="0" />
+          <Stop offset="1" stopColor="#1A6586" stopOpacity="1" />
         </LinearGradient>
+        <LinearGradient id={`fur-${uid}`} gradientUnits="userSpaceOnUse" x1="0" y1="65" x2="0" y2="114.6">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="0.65" stopColor="#FBFEFF" />
+          <Stop offset="1" stopColor="#D3EEF5" />
+        </LinearGradient>
+        <LinearGradient id={`sun-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#FFB08F" />
+          <Stop offset="1" stopColor="#FF7E5F" />
+        </LinearGradient>
+        <ClipPath id={`above-${uid}`}>
+          <Path d="M0 0 H240 V114.6 C 205 109.6 175 119.6 120 114.6 C 65 109.6 35 119.6 0 114.6 Z" />
+        </ClipPath>
+        <ClipPath id={`below-${uid}`}>
+          <Path d="M0 114.6 C 35 119.6 65 109.6 120 114.6 C 175 119.6 205 109.6 240 114.6 V240 H0 Z" />
+        </ClipPath>
       </Defs>
       <Defs>
         <ClipPath id={`clip-${uid}`}>
@@ -38,38 +47,43 @@ export default function BrandMark({ size = 120, uid = 'bm' }: Props) {
         </ClipPath>
       </Defs>
       <G clipPath={`url(#clip-${uid})`}>
-        <Rect width="240" height="240" fill={`url(#bg-${uid})`} />
-        <Circle cx="206" cy="66" r="5" fill="none" stroke="#FFFFFF" strokeWidth="2.4" opacity="0.85" />
-        <Circle cx="219" cy="44" r="3" fill="none" stroke="#FFFFFF" strokeWidth="2" opacity="0.7" />
-        <Circle cx="30" cy="84" r="4" fill="none" stroke="#FFFFFF" strokeWidth="2.2" opacity="0.75" />
-        <Ellipse cx="62" cy="212" rx="17" ry="3.6" fill="#FFFFFF" opacity="0.28" />
-        <Ellipse cx="182" cy="216" rx="13" ry="3" fill="#FFFFFF" opacity="0.22" />
-        <Circle cx="68" cy="58" r="21" fill={`url(#fur-${uid})`} />
-        <Circle cx="172" cy="58" r="21" fill={`url(#fur-${uid})`} />
-        <Circle cx="69" cy="60" r="11" fill="#FFB3A1" />
-        <Circle cx="171" cy="60" r="11" fill="#FFB3A1" />
-        <Circle cx="120" cy="108" r="68" fill={`url(#fur-${uid})`} />
-        <Path d="M73 102 L53 97" stroke="#FF7E5F" strokeWidth="7" strokeLinecap="round" />
-        <Path d="M167 102 L187 97" stroke="#FF7E5F" strokeWidth="7" strokeLinecap="round" />
-        <Rect x="104" y="98" width="32" height="9" rx="4.5" fill="#FF7E5F" />
-        <Circle cx="90" cy="103" r="23" fill="#FF7E5F" />
-        <Circle cx="150" cy="103" r="23" fill="#FF7E5F" />
-        <Circle cx="90" cy="103" r="18" fill={`url(#lens-${uid})`} />
-        <Circle cx="150" cy="103" r="18" fill={`url(#lens-${uid})`} />
-        <Path d="M78 96 q5 -8 14 -9" stroke="#FFFFFF" strokeWidth="3.2" strokeLinecap="round" fill="none" opacity="0.9" />
-        <Path d="M138 96 q5 -8 14 -9" stroke="#FFFFFF" strokeWidth="3.2" strokeLinecap="round" fill="none" opacity="0.9" />
-        <Path d="M82 106 q8 8 16 0" stroke="#0B2A4A" strokeWidth="3.6" strokeLinecap="round" fill="none" />
-        <Path d="M142 106 q8 8 16 0" stroke="#0B2A4A" strokeWidth="3.6" strokeLinecap="round" fill="none" />
-        <Ellipse cx="120" cy="128" rx="9" ry="6.5" fill="#0B2A4A" />
-        <Path d="M111 137 q9 7 18 0" stroke="#0B2A4A" strokeWidth="3" strokeLinecap="round" fill="none" />
-        <Circle cx="73" cy="130" r="8" fill="#FF7E5F" opacity="0.38" />
-        <Circle cx="167" cy="130" r="8" fill="#FF7E5F" opacity="0.38" />
-        <Path d="M-10 160 C 30 148 72 148 112 158 S 190 170 250 152 L250 250 L-10 250 Z" fill="#B4EAF1" />
-        <Ellipse cx="66" cy="164" rx="27" ry="15" fill="#FFFFFF" rotation={-8} origin="66, 164" />
-        <Ellipse cx="174" cy="163" rx="27" ry="15" fill="#FFFFFF" rotation={8} origin="174, 163" />
-        <Path d="M54 160 v5 M64 158 v6 M74 158 v6" stroke="#C5E3EA" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-        <Path d="M166 158 v6 M176 158 v6 M186 160 v5" stroke="#C5E3EA" strokeWidth="2.6" strokeLinecap="round" fill="none" />
-        <Path d="M-10 182 C 40 170 92 174 132 184 S 204 194 250 176 L250 250 L-10 250 Z" fill={`url(#water-${uid})`} />
+        <Rect width="240" height="240" fill={`url(#sky-${uid})`} />
+        <Circle cx="57" cy="62" r="15" fill={`url(#sun-${uid})`} />
+        <Path d="M0 114.6 C 35 119.6 65 109.6 120 114.6 C 175 119.6 205 109.6 240 114.6 V240 H0 Z" fill={`url(#sea-${uid})`} />
+        <G clipPath={`url(#below-${uid})`}>
+          <G>
+            <Path d="M140.1 133.4 L161.3 171.2" stroke="#8ADBEA" strokeWidth="16.5" strokeLinecap="round" fill="none" />
+            <Path d="M121.2 135.8 L140.1 178.3" stroke="#8ADBEA" strokeWidth="16.5" strokeLinecap="round" fill="none" />
+            <Path d="M71.6 135.8 L59.8 178.3" stroke="#8ADBEA" strokeWidth="16.5" strokeLinecap="round" fill="none" />
+            <Path d="M52.7 131.1 L36.2 168.8" stroke="#8ADBEA" strokeWidth="16.5" strokeLinecap="round" fill="none" />
+            <Ellipse cx="97.6" cy="119.3" rx="72" ry="30.7" fill="#8ADBEA" />
+            <Ellipse cx="114.1" cy="99.2" rx="31.9" ry="15.3" fill="#8ADBEA" />
+            <Ellipse cx="151.9" cy="96.9" rx="27.1" ry="18.9" fill="#8ADBEA" rotation={-38} origin="151.9, 96.9" />
+            <Ellipse cx="177.8" cy="83.9" rx="23.6" ry="17.7" fill="#8ADBEA" />
+            <Ellipse cx="201.4" cy="91" rx="17.7" ry="9.4" fill="#8ADBEA" rotation={6} origin="201.4, 91" />
+            <Circle cx="168.4" cy="68.5" r="7.1" fill="#8ADBEA" />
+            <Circle cx="28" cy="113.4" r="8.3" fill="#8ADBEA" />
+          </G>
+          <Rect x="0" y="114.6" width="240" height="125.4" fill={`url(#fade-${uid})`} />
+        </G>
+        <G clipPath={`url(#above-${uid})`}>
+          <Path d="M140.1 133.4 L161.3 171.2" stroke={`url(#fur-${uid})`} strokeWidth="16.5" strokeLinecap="round" fill="none" />
+          <Path d="M121.2 135.8 L140.1 178.3" stroke={`url(#fur-${uid})`} strokeWidth="16.5" strokeLinecap="round" fill="none" />
+          <Path d="M71.6 135.8 L59.8 178.3" stroke={`url(#fur-${uid})`} strokeWidth="16.5" strokeLinecap="round" fill="none" />
+          <Path d="M52.7 131.1 L36.2 168.8" stroke={`url(#fur-${uid})`} strokeWidth="16.5" strokeLinecap="round" fill="none" />
+          <Ellipse cx="97.6" cy="119.3" rx="72" ry="30.7" fill={`url(#fur-${uid})`} />
+          <Ellipse cx="114.1" cy="99.2" rx="31.9" ry="15.3" fill={`url(#fur-${uid})`} />
+          <Ellipse cx="151.9" cy="96.9" rx="27.1" ry="18.9" fill={`url(#fur-${uid})`} rotation={-38} origin="151.9, 96.9" />
+          <Ellipse cx="177.8" cy="83.9" rx="23.6" ry="17.7" fill={`url(#fur-${uid})`} />
+          <Ellipse cx="201.4" cy="91" rx="17.7" ry="9.4" fill={`url(#fur-${uid})`} rotation={6} origin="201.4, 91" />
+          <Circle cx="168.4" cy="68.5" r="7.1" fill={`url(#fur-${uid})`} />
+          <Circle cx="28" cy="113.4" r="8.3" fill={`url(#fur-${uid})`} />
+          <Circle cx="186.1" cy="79.2" r="2.7" fill="#0B2A4A" />
+          <Ellipse cx="217.9" cy="89.8" rx="4.5" ry="3.7" fill="#0B2A4A" />
+        </G>
+        <Path d="M0 114.6 C 35 119.6 65 109.6 120 114.6 C 175 119.6 205 109.6 240 114.6" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" fill="none" opacity="0.7" />
+        <Ellipse cx="149.5" cy="117.6" rx="35.4" ry="4.7" fill="none" stroke="#FFFFFF" strokeWidth="1.7" opacity="0.6" />
+        <Ellipse cx="102.3" cy="120.6" rx="92" ry="7.1" fill="none" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.26" />
       </G>
     </Svg>
   );
