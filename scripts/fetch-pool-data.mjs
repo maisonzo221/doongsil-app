@@ -24,7 +24,8 @@ const BESSEL_TM =
   '+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 ' +
   '+ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43';
 const WGS84 = '+proj=longlat +datum=WGS84 +no_defs';
-const CLOSED = /(폐업|취소|말소)/;
+// 폐업/취소/말소 + 휴업·만료·정지·중지(지금 운영하지 않는 곳)는 뺀다.
+const CLOSED = /(폐업|취소|말소|휴업|만료|정지|중지)/;
 
 function loadKey() {
   if (process.env.EXPO_PUBLIC_POOL_DATA_API_KEY) return process.env.EXPO_PUBLIC_POOL_DATA_API_KEY.trim();
@@ -139,21 +140,43 @@ function toRow(item) {
   const goyangAll = openItems.filter((i) => /고양시/.test(`${i.ROAD_NM_ADDR} ${i.LOTNO_ADDR}`));
   console.log(`  고양시: 폐업 아닌 곳 ${goyangAll.length}건 (좌표 있음 ${goyangAll.filter(hasCoord).length})`);
 
-  const skipped = { closed: 0, nocoord: 0, badcoord: 0, noname: 0, dup: 0 };
-  const byId = new Map();
+  // 관리번호가 시설마다 고유하지 않다(서로 다른 수영장이 같은 번호를 쓰는 경우가 많다).
+  // 그래서 관리번호만으로 중복을 지우면 멀쩡한 수영장이 대량으로 사라진다. 관리번호+이름+주소가
+  // 모두 같을 때만 같은 시설의 여러 기록으로 보고, 그중 가장 최근 기록만 남긴다.
+  // (예전 '영업' 기록 때문에 이미 폐업한 곳이 되살아나지 않도록, 영업 여부는 최신 기록으로 판단한다.)
+  const norm = (v) => String(v || '').replace(/\s+/g, '').toLowerCase();
+  const stamp = (i) => String(i.LAST_MDFCN_PNT || i.DAT_UPDT_PNT || '');
+  const latest = new Map();
   for (const item of raw) {
+    const key = `${item.MNG_NO}|${norm(item.BPLC_NM)}|${norm(item.ROAD_NM_ADDR || item.LOTNO_ADDR)}`;
+    const prev = latest.get(key);
+    if (!prev || stamp(item) >= stamp(prev)) latest.set(key, item);
+  }
+
+  const idGroups = new Map();
+  raw.forEach((i) => idGroups.set(String(i.MNG_NO), (idGroups.get(String(i.MNG_NO)) || 0) + 1));
+  const sharedIds = [...idGroups.values()].filter((n) => n > 1).length;
+  console.log(`  관리번호 ${idGroups.size}종류 / 전체 ${raw.length}행 → 같은 관리번호가 여러 행인 경우 ${sharedIds}종류`);
+  console.log(`  관리번호+이름+주소가 같은 기록을 합친 뒤 ${latest.size}곳 (합쳐진 기록 ${raw.length - latest.size}건)`);
+
+  const skipped = { closed: 0, nocoord: 0, badcoord: 0, noname: 0, dup: raw.length - latest.size };
+  const built = [];
+  for (const item of latest.values()) {
     const r = toRow(item);
     if (r.skip) {
       skipped[r.skip]++;
       continue;
     }
-    if (byId.has(r.row[0])) {
-      skipped.dup++;
-      continue;
-    }
-    byId.set(r.row[0], r.row);
+    built.push(r.row);
   }
-  const rows = Array.from(byId.values()).sort((a, b) => a[2].localeCompare(b[2], 'ko') || a[1].localeCompare(b[1], 'ko'));
+  const rows = built.sort((a, b) => a[2].localeCompare(b[2], 'ko') || a[1].localeCompare(b[1], 'ko'));
+  // 서로 다른 수영장이 같은 관리번호를 쓰면 앱에서 구분이 안 되므로 id 뒤에 번호를 붙인다.
+  const idUsed = new Map();
+  for (const r of rows) {
+    const n = idUsed.get(r[0]) || 0;
+    idUsed.set(r[0], n + 1);
+    if (n > 0) r[0] = `${r[0]}#${n + 1}`;
+  }
 
   if (rows.length < MIN_EXPECTED) {
     console.error(`❌ 쓸 수 있는 수영장이 ${rows.length}곳뿐이에요(최소 ${MIN_EXPECTED}곳 예상). 기존 파일은 그대로 두었어요.`);
