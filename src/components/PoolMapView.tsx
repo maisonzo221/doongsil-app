@@ -19,6 +19,10 @@ interface Props {
   /** GPS로 얻은 사용자 현재 위치 — 아직 선택된 수영장이 없을 때 지도 초기 중심으로 쓰고,
    * 파란 점으로 내 위치도 같이 표시한다. */
   userLocation?: { lat: number; lng: number } | null;
+  /** 동네 검색 결과 위치 — 있으면 지도를 이 좌표로 열고(첫 수영장으로 튀지 않음), 카드/핀을 누를 때만 이동한다. */
+  focus?: { lat: number; lng: number; zoom?: number } | null;
+  /** 사용자가 지도를 끌어서 옮겼을 때 새 중심 좌표를 알려준다 ("이 지역에서 검색"용). */
+  onMapMoved?: (center: { lat: number; lng: number }) => void;
 }
 
 const NAVER_CLIENT_ID = process.env.EXPO_PUBLIC_NAVER_MAP_CLIENT_ID;
@@ -34,11 +38,13 @@ export const isNaverMapConfigured = !!NAVER_CLIENT_ID;
 // Application 등록 후 발급받은 값.
 function mapHtml(
   points: { id: string; name: string; addr: string; lat: number; lng: number }[],
-  userLoc?: { lat: number; lng: number } | null
+  userLoc?: { lat: number; lng: number } | null,
+  focus?: { lat: number; lng: number; zoom?: number } | null
 ): string {
   // 선택된 수영장이 아직 없으면 GPS 현재 위치를 중심으로 잡는다 — 위치 권한이 없거나
   // 아직 못 받아왔으면 기존대로 첫 번째 결과(또는 서울시청)를 기준으로 삼는다.
-  const center = userLoc ?? (points.length ? points[0] : { lat: 37.5665, lng: 126.978 });
+  const center = focus ?? userLoc ?? (points.length ? points[0] : { lat: 37.5665, lng: 126.978 });
+  const zoom = focus ? focus.zoom ?? 14 : points.length > 1 ? 11 : 15;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -62,7 +68,7 @@ function mapHtml(
 
   const map = new naver.maps.Map('map', {
     center: new naver.maps.LatLng(${center.lat}, ${center.lng}),
-    zoom: ${points.length > 1 ? 11 : 15}
+    zoom: ${zoom}
   });
 
   ${
@@ -119,7 +125,7 @@ function mapHtml(
     infoWindowsById[p.id] = infoWindow;
     bounds.extend(position);
   });
-  if (points.length > 1) {
+  if (!${focus ? 'true' : 'false'} && points.length > 1) {
     map.fitBounds(bounds, { top: 80, right: 40, bottom: 160, left: 40 });
   }
 
@@ -150,6 +156,12 @@ function mapHtml(
     openPopup(id);
   };
 
+  // 사용자가 지도를 끌어서 옮기면 새 중심을 알려준다 — "이 지역에서 검색" 버튼용.
+  naver.maps.Event.addListener(map, 'dragend', function () {
+    const c = map.getCenter();
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapMoved', lat: c.lat(), lng: c.lng() }));
+  });
+
   // 지도/핀이 다 준비된 뒤에 RN에 알려준다 — 그 전에 flyToPool을 호출하면 아무 일도
   // 안 일어나는데(함수는 있어도 마커가 아직 안 올라와 있을 수 있음), RN 쪽에서 이 신호를
   // 받을 때까지 기다렸다가 선택 이동을 보내게 하기 위함.
@@ -159,7 +171,16 @@ function mapHtml(
 </html>`;
 }
 
-export default function PoolMapView({ pools, fill, selectedId, selectToken, onSelectPool, userLocation }: Props) {
+export default function PoolMapView({
+  pools,
+  fill,
+  selectedId,
+  selectToken,
+  onSelectPool,
+  userLocation,
+  focus,
+  onMapMoved,
+}: Props) {
   const webviewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const points = useMemo(
@@ -169,12 +190,16 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
         .map((p) => ({ id: p.id, name: p.name, addr: p.roadAddress, lat: p.lat as number, lng: p.lng as number })),
     [pools]
   );
-  const html = useMemo(() => mapHtml(points, userLocation), [points, userLocation]);
+  const html = useMemo(() => mapHtml(points, userLocation, focus), [points, userLocation, focus]);
+  // 지도가 새로 로드될 때의 selectToken. 이 값에서 안 바뀌었으면 사용자가 아직 카드/핀을 안 눌렀다는 뜻이다.
+  const tokenAtLoad = useRef(selectToken);
 
   // html이 바뀌면(검색 결과가 바뀌어 지도가 통째로 다시 로드되면) WebView 안의 지도도
   // 처음부터 다시 만들어지므로, 새로 "mapReady" 신호가 올 때까지 다시 기다려야 한다.
   useEffect(() => {
     setMapReady(false);
+    tokenAtLoad.current = selectToken;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [html]);
 
   useEffect(() => {
@@ -182,6 +207,8 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
     // (특히 처음 지도가 뜰 때 바로 카드를 누르는 경우) — mapReady가 될 때까지 기다렸다가
     // 보낸다. mapReady가 그 사이에 true로 바뀌면 이 effect가 다시 돌면서 바로 전송된다.
     if (!selectedId || !mapReady) return;
+    // 동네를 검색한 직후엔 입력한 동네 위치를 그대로 보여주고, 카드나 핀을 눌렀을 때만 이동한다.
+    if (focus && selectToken === tokenAtLoad.current) return;
     webviewRef.current?.injectJavaScript(
       `window.flyToPool && window.flyToPool(${JSON.stringify(selectedId)}); true;`
     );
@@ -191,7 +218,7 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
   }, [selectedId, selectToken, mapReady]);
 
   function handleMessage(event: WebViewMessageEvent) {
-    let msg: { type: string; id?: string };
+    let msg: { type: string; id?: string; lat?: number; lng?: number };
     try {
       msg = JSON.parse(event.nativeEvent.data);
     } catch {
@@ -199,6 +226,10 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
     }
     if (msg.type === 'mapReady') {
       setMapReady(true);
+      return;
+    }
+    if (msg.type === 'mapMoved' && msg.lat != null && msg.lng != null) {
+      onMapMoved?.({ lat: msg.lat, lng: msg.lng });
       return;
     }
     const pool = pools.find((p) => p.id === msg.id);
@@ -211,7 +242,7 @@ export default function PoolMapView({ pools, fill, selectedId, selectToken, onSe
     }
   }
 
-  if (points.length === 0 || !isNaverMapConfigured) return null;
+  if ((points.length === 0 && !focus) || !isNaverMapConfigured) return null;
 
   // 웹(Expo Web)에선 react-native-webview가 제대로 안 뜬다 — 실제 iOS 앱에서만 지원.
   if (Platform.OS === 'web') {

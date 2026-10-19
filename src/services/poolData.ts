@@ -7,6 +7,7 @@
 import proj4 from 'proj4';
 import { PUBLIC_POOL_FACILITIES } from '../data/publicPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
+import { dedupeAgainst, isInKorea, PlaceInfo, rankNearby } from './geo';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
 const BASE_URL = 'https://apis.data.go.kr/1741000/swimming_pools/info';
@@ -47,6 +48,8 @@ export interface OfficialPool {
   notes?: string;
   /** 검색어로 직접 매칭된 게 아니라 반경 검색으로 끼어든 주변 수영장이면 true. */
   nearbyMatch?: boolean;
+  /** 동네 검색일 때, 검색한 위치에서 이 수영장까지의 거리(km). */
+  distanceKm?: number;
 }
 
 export const isPoolDataConfigured = !!API_KEY;
@@ -259,6 +262,78 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   } catch {
     return withNearby(publicResults).filter(hasUsefulInfo);
   }
+}
+
+// ───────── 동네(지역) 기준 검색 ─────────
+// 동네를 치면 그 위치 주변 수영장을 거리순으로 보여준다. 번들 데이터(서울+전국 공공시설)에
+// 없는 지역(예: 고양시)은 전국 인허가 수영장 API를 그 지역 주소로 조회해서 채운다.
+// 이 API 결과엔 운영시간/요금이 없어서 기존 검색에선 숨겼지만, 동네 검색에서는 "근처에 수영장이
+// 있다"는 것 자체가 정보라서 이름/주소/전화/길찾기만으로도 보여준다.
+const REGION_PAGE_SIZE = 100;
+const REGION_MAX_PAGES = 4;
+const regionCache = new Map<string, OfficialPool[]>();
+
+async function fetchRegionPage(field: 'ROAD_NM_ADDR' | 'LOTNO_ADDR', term: string, pageNo: number) {
+  const params = new URLSearchParams({
+    serviceKey: API_KEY as string,
+    pageNo: String(pageNo),
+    numOfRows: String(REGION_PAGE_SIZE),
+    returnType: 'json',
+  });
+  params.set(`cond[${field}::LIKE]`, term);
+  const res = await fetch(`${BASE_URL}?${params.toString()}`);
+  const json = await res.json();
+  const body = json?.response?.body;
+  const items = body?.items?.item ?? [];
+  return {
+    items: (Array.isArray(items) ? items : [items]).filter(Boolean),
+    total: Number(body?.totalCount ?? 0),
+  };
+}
+
+/** 주소에 지역명(예: "고양시")이 들어간 인허가 수영장 전부(최대 4페이지×2필드). 한 번 받으면 앱을 쓰는 동안 재사용한다. */
+async function fetchRegionPools(term: string): Promise<OfficialPool[]> {
+  const cached = regionCache.get(term);
+  if (cached) return cached;
+
+  const fields = ['ROAD_NM_ADDR', 'LOTNO_ADDR'] as const;
+  const firsts = await Promise.all(fields.map((f) => fetchRegionPage(f, term, 1)));
+  const rest = await Promise.all(
+    fields.flatMap((f, i) => {
+      const pages = Math.min(REGION_MAX_PAGES, Math.ceil(firsts[i].total / REGION_PAGE_SIZE));
+      return Array.from({ length: Math.max(0, pages - 1) }, (_, k) => fetchRegionPage(f, term, k + 2));
+    })
+  );
+
+  const byId = new Map<string, OfficialPool>();
+  [...firsts, ...rest]
+    .flatMap((r) => r.items)
+    .map(mapItem)
+    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName) && isInKorea(p.lat, p.lng))
+    .forEach((p) => byId.set(p.id, p));
+  const result = Array.from(byId.values());
+  regionCache.set(term, result);
+  return result;
+}
+
+/** 검색한 장소 주변 수영장을 가까운 순으로 돌려준다. API가 실패해도 번들 데이터만으로 결과를 낸다. */
+export async function findPoolsNear(place: PlaceInfo, limit = 40): Promise<OfficialPool[]> {
+  const bundled = [
+    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
+    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
+  ].filter((p) => isInKorea(p.lat, p.lng));
+
+  let business: OfficialPool[] = [];
+  if (API_KEY && place.regionTerms.length > 0) {
+    try {
+      business = (await Promise.all(place.regionTerms.map(fetchRegionPools))).flat();
+    } catch {
+      business = [];
+    }
+  }
+
+  const extra = dedupeAgainst(bundled, business);
+  return rankNearby([...bundled, ...extra], place, place.radiusKm, limit);
 }
 
 /** 수영장 찾기 탭에 처음 들어왔을 때(아직 검색 전) 지도를 바로 보여주기 위한 기본 목록.

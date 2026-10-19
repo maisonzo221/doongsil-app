@@ -26,6 +26,7 @@ import {
   getBoardPosts,
 } from '../../storage/tipRoom';
 import {
+  findPoolsNear,
   getDefaultOfficialPools,
   getFreeSwimPools,
   isPoolDataConfigured,
@@ -35,6 +36,8 @@ import {
   searchOfficialPools,
 } from '../../services/poolData';
 import { getCurrentUser, UserProfile } from '../../storage/auth';
+import { looksLikeAdminPlace, PlaceInfo } from '../../services/geo';
+import { geocodePlace, reversePlace } from '../../services/placeSearch';
 
 type Props = NativeStackScreenProps<TipRoomStackParamList, 'TipRoomHome'>;
 
@@ -69,6 +72,14 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [officialPools, setOfficialPools] = useState<OfficialPool[]>([]);
   const [loadingOfficial, setLoadingOfficial] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  // 동네를 검색해서 찾은 위치. 있으면 지도가 그 위치로 열리고 목록은 그 주변 수영장(거리순)이다.
+  const [place, setPlace] = useState<PlaceInfo | null>(null);
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  // 사용자가 지도를 끌어서 옮긴 새 중심 — 있으면 "이 지역에서 검색" 버튼을 보여준다.
+  const [movedCenter, setMovedCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [areaSearching, setAreaSearching] = useState(false);
+  // PoolMapView의 지도 HTML이 focus 값에 의존하므로, 매 렌더마다 새 객체를 만들면 지도가 계속 다시 로드된다.
+  const mapFocus = useMemo(() => (place ? { lat: place.lat, lng: place.lng, zoom: 14 } : null), [place]);
   const [selectedPoolId, setSelectedPoolId] = useState<string | null>(null);
   // 이미 선택된 카드를 또 눌러도(특히 첫 번째 카드는 처음부터 선택돼 있어서 id가 안 바뀜)
   // 지도가 다시 그쪽으로 이동하도록, 탭할 때마다 값을 바꿔서 PoolMapView에 넘긴다.
@@ -106,24 +117,97 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     if (!poolSearch.trim()) {
       // 검색 전에도 지도가 켜져있어야 하므로, 기본 수영장 목록으로 미리 채워둔다.
       // GPS 위치를 받아오면(비동기) 거리순으로 다시 정렬돼서 자동으로 업데이트된다.
+      setPlace(null);
+      setSearchNote(null);
+      setMovedCenter(null);
+      setLoadingOfficial(false);
       setOfficialPools(getDefaultOfficialPools(30, userLocation ?? undefined));
       return;
     }
     let cancelled = false;
     setLoadingOfficial(true);
-    const timer = setTimeout(() => {
-      searchOfficialPools(poolSearch).then((results) => {
-        if (!cancelled) {
-          setOfficialPools(results);
-          setLoadingOfficial(false);
+    const timer = setTimeout(async () => {
+      const q = poolSearch.trim();
+      const showPlace = async (found: PlaceInfo) => {
+        const near = await findPoolsNear(found);
+        if (cancelled) return;
+        setPlace(found);
+        setMovedCenter(null);
+        setSearchNote(
+          near.length > 0
+            ? `${found.label} 근처 · 수영장 ${near.length}곳`
+            : `${found.label} 근처에서 수영장을 찾지 못했어요`
+        );
+        setOfficialPools(near);
+      };
+      const showByName = (results: OfficialPool[], note: string | null) => {
+        if (cancelled) return;
+        setPlace(null);
+        setMovedCenter(null);
+        setSearchNote(note);
+        setOfficialPools(results);
+      };
+
+      try {
+        // "정발산동", "고양시 일산동구"처럼 지역 이름이면 지도에서 그 동네를 먼저 찾는다.
+        if (looksLikeAdminPlace(q)) {
+          const found = await geocodePlace(q, userLocation);
+          if (cancelled) return;
+          if (found) {
+            await showPlace(found);
+            return;
+          }
         }
-      });
-    }, 400);
+        // 수영장 이름/주소로 직접 찾아본다 (예: "회현체육관").
+        const byName = await searchOfficialPools(q);
+        if (cancelled) return;
+        if (byName.some((p) => !p.nearbyMatch)) {
+          showByName(byName, null);
+          return;
+        }
+        // 이름으로는 없으면 "일산"처럼 지역 이름일 수 있으니 동네로 한 번 더 찾아본다.
+        if (!looksLikeAdminPlace(q)) {
+          const found = await geocodePlace(q, userLocation);
+          if (cancelled) return;
+          if (found) {
+            await showPlace(found);
+            return;
+          }
+        }
+        showByName(byName, byName.length === 0 ? `"${q}" 위치나 수영장을 찾지 못했어요. 지역 이름을 확인해주세요.` : null);
+      } finally {
+        if (!cancelled) setLoadingOfficial(false);
+      }
+    }, 700);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
   }, [tab, poolSearch, userLocation]);
+
+  // 지도를 끌어서 옮긴 뒤 "이 지역에서 검색"을 누르면, 지도 중심 주변 수영장을 찾는다.
+  async function searchHere() {
+    if (!movedCenter || areaSearching) return;
+    setAreaSearching(true);
+    try {
+      const found = (await reversePlace(movedCenter.lat, movedCenter.lng)) ?? {
+        lat: movedCenter.lat,
+        lng: movedCenter.lng,
+        label: '지도 중심',
+        radiusKm: 4,
+        regionTerms: [],
+      };
+      const near = await findPoolsNear(found);
+      setPlace(found);
+      setMovedCenter(null);
+      setSearchNote(
+        near.length > 0 ? `${found.label} 근처 · 수영장 ${near.length}곳` : `${found.label} 근처에서 수영장을 찾지 못했어요`
+      );
+      setOfficialPools(near);
+    } finally {
+      setAreaSearching(false);
+    }
+  }
 
   useEffect(() => {
     setSelectedPoolId(officialPools.length > 0 ? officialPools[0].id : null);
@@ -233,7 +317,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
           </ScrollView>
         ) : tab === 'pools' ? (
           <View style={styles.mapScreen}>
-            {isPoolDataConfigured && isNaverMapConfigured && officialPools.length > 0 ? (
+            {isPoolDataConfigured && isNaverMapConfigured && (officialPools.length > 0 || mapFocus) ? (
               <PoolMapView
                 pools={officialPools}
                 fill
@@ -241,6 +325,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                 selectToken={poolSelectToken}
                 onSelectPool={selectPool}
                 userLocation={userLocation}
+                focus={mapFocus}
+                onMapMoved={setMovedCenter}
               />
             ) : (
               <View style={styles.mapPlaceholder}>
@@ -262,12 +348,30 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                   style={styles.floatingSearchInput}
                   value={poolSearch}
                   onChangeText={setPoolSearch}
-                  placeholder="수영장 이름이나 지역(예: 강남구)으로 검색"
+                  placeholder="수영장 이름이나 동네(예: 정발산동, 고양시)로 검색"
                   placeholderTextColor={colors.textMuted}
+                  returnKeyType="search"
                 />
-                {loadingOfficial && <ActivityIndicator color={colors.primary} size="small" />}
+                {(loadingOfficial || areaSearching) && <ActivityIndicator color={colors.primary} size="small" />}
               </View>
             </View>
+
+            {(!!searchNote || !!movedCenter) && (
+              <View style={styles.floatingNoteWrap} pointerEvents="box-none">
+                {!!searchNote && (
+                  <View style={styles.noteChip}>
+                    <Text style={styles.noteText} numberOfLines={1}>
+                      {searchNote}
+                    </Text>
+                  </View>
+                )}
+                {!!movedCenter && (
+                  <TouchableOpacity style={styles.hereButton} onPress={searchHere} disabled={areaSearching}>
+                    <Text style={styles.hereButtonText}>이 지역에서 검색</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {officialPools.length > 0 && (
               <FlatList
@@ -301,6 +405,11 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                           {item.nearbyMatch && (
                             <View style={styles.nearbyBadge}>
                               <Text style={styles.nearbyBadgeText}>근처</Text>
+                            </View>
+                          )}
+                          {item.distanceKm != null && (
+                            <View style={styles.nearbyBadge}>
+                              <Text style={styles.nearbyBadgeText}>{item.distanceKm}km</Text>
                             </View>
                           )}
                           <Text style={[styles.poolName, selected && styles.poolNameEnlarged]} numberOfLines={selected ? 2 : 1}>
@@ -602,6 +711,27 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   floatingSearchInput: { flex: 1, fontFamily: fonts.regular, color: colors.text, fontSize: 14 },
+  floatingNoteWrap: { position: 'absolute', top: 64, left: spacing.sm, right: spacing.sm, alignItems: 'center', gap: spacing.hairline + 2 },
+  noteChip: {
+    backgroundColor: 'rgba(11,42,74,0.86)',
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.hairline + 2,
+    maxWidth: '100%',
+  },
+  noteText: { fontFamily: fonts.semibold, color: colors.white, fontSize: 12 },
+  hereButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  hereButtonText: { fontFamily: fonts.bold, color: colors.white, fontSize: 13 },
   bottomCarouselWrap: { position: 'absolute', left: 0, right: 0, bottom: spacing.sm },
   bottomCarousel: { paddingHorizontal: spacing.sm, gap: spacing.xs },
   poolCardFloating: {
