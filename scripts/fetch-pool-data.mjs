@@ -17,7 +17,7 @@ const BASE = process.env.POOL_API_BASE || 'https://apis.data.go.kr/1741000/swimm
 
 const PAGE_SIZE = 100; // 앱이 이미 쓰고 있는 검증된 값
 const CONCURRENCY = 5;
-const MIN_EXPECTED = 200; // 이보다 적게 받으면 뭔가 잘못된 것 — 기존 파일을 덮어쓰지 않는다.
+const MIN_EXPECTED = 30; // 이보다 적게 받으면 뭔가 잘못된 것 — 기존 파일을 덮어쓰지 않는다.
 
 // 앱(poolData.ts)과 같은 좌표계 변환: EPSG:5174(Bessel 중부원점 TM) → WGS84.
 const BESSEL_TM =
@@ -121,6 +121,23 @@ function toRow(item) {
     })
   );
   process.stdout.write('\n');
+
+  // ── 왜 이만큼만 남는지 보여주는 진단 (결과가 적을 때 원인을 찾기 위함) ──
+  const hasCoord = (i) => Number(i.CRD_INFO_X) && Number(i.CRD_INFO_Y);
+  const statusCount = {};
+  raw.forEach((i) => {
+    const k = i.SALS_STTS_NM || '(없음)';
+    statusCount[k] = (statusCount[k] || 0) + 1;
+  });
+  const openItems = raw.filter((i) => !CLOSED.test(i.SALS_STTS_NM || ''));
+  const openNoCoord = openItems.filter((i) => !hasCoord(i));
+  console.log('\n[진단]');
+  console.log('  영업상태별: ' + Object.entries(statusCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k} ${v}`).join(' | '));
+  console.log(`  폐업이 아닌 곳 ${openItems.length}건 → 좌표 있음 ${openItems.length - openNoCoord.length} / 좌표 없음 ${openNoCoord.length}`);
+  console.log(`  응답에 들어있는 항목 이름: ${Object.keys(raw[0] || {}).join(', ')}`);
+  openNoCoord.slice(0, 3).forEach((i) => console.log(`  (좌표 없는 예) ${i.BPLC_NM} / ${i.ROAD_NM_ADDR || i.LOTNO_ADDR}`));
+  const goyangAll = openItems.filter((i) => /고양시/.test(`${i.ROAD_NM_ADDR} ${i.LOTNO_ADDR}`));
+  console.log(`  고양시: 폐업 아닌 곳 ${goyangAll.length}건 (좌표 있음 ${goyangAll.filter(hasCoord).length})`);
 
   const skipped = { closed: 0, nocoord: 0, badcoord: 0, noname: 0, dup: 0 };
   const byId = new Map();
