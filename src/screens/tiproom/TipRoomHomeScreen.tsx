@@ -161,7 +161,9 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
         // 수영장 이름/주소로 직접 찾아본다 (예: "회현체육관").
         const byName = await searchOfficialPools(q);
         if (cancelled) return;
-        if (byName.some((p) => !p.nearbyMatch)) {
+        // 주소에만 글자가 겹친 건(예: "고양"이 고양시 수영장 전부의 주소에 있음) 이름 검색으로 안 친다.
+        const words = q.split(/\s+/);
+        if (byName.some((p) => !p.nearbyMatch && words.every((w) => p.name.includes(w)))) {
           showByName(byName, null);
           return;
         }

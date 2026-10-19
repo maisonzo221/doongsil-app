@@ -131,8 +131,14 @@ export function dedupeAgainst<T extends GeoPoint, U extends GeoPoint>(base: T[],
   return extra.filter((e) => {
     if (names.has(normalizeName(e.name))) return false;
     if (e.lat == null || e.lng == null) return true;
+    // 위경도 0.002도(약 200m) 이상 떨어진 건 거리 계산 없이 바로 제외한다 — 수천 건 x 수백 건 비교를 빠르게.
     return !base.some(
-      (b) => b.lat != null && b.lng != null && haversineKm(b.lat, b.lng, e.lat as number, e.lng as number) < 0.12
+      (b) =>
+        b.lat != null &&
+        b.lng != null &&
+        Math.abs(b.lat - (e.lat as number)) < 0.002 &&
+        Math.abs(b.lng - (e.lng as number)) < 0.002 &&
+        haversineKm(b.lat, b.lng, e.lat as number, e.lng as number) < 0.12
     );
   });
 }

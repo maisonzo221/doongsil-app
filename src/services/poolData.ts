@@ -7,6 +7,7 @@
 import proj4 from 'proj4';
 import { PUBLIC_POOL_FACILITIES } from '../data/publicPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
+import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
 import { dedupeAgainst, isInKorea, PlaceInfo, rankNearby } from './geo';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
@@ -52,7 +53,8 @@ export interface OfficialPool {
   distanceKm?: number;
 }
 
-export const isPoolDataConfigured = !!API_KEY;
+// 전국 인허가 스냅샷이 번들돼 있으면 API 키 없이도 동작한다.
+export const isPoolDataConfigured = !!API_KEY || LICENSED_POOL_FACILITIES.length > 0;
 
 function toLatLng(xRaw: string, yRaw: string): { lat?: number; lng?: number } {
   const x = Number(xRaw);
@@ -147,6 +149,47 @@ function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
   }).map(mapSeoulFacility);
 }
 
+// ───────── 전국 인허가 수영장 스냅샷 (scripts/fetch-pool-data.mjs로 생성) ─────────
+// 스냅샷이 있으면 기본 목록/동네 검색/이름 검색을 전부 이 데이터로 처리한다 — 실시간 API 없이
+// 전국이 바로 나오고, 페이지 제한도 없다. 비어 있으면(아직 내려받기 전) 예전처럼 API로 대신한다.
+const HAS_SNAPSHOT = LICENSED_POOL_FACILITIES.length > 0;
+
+function mapLicensed(r: LicensedPoolRow): OfficialPool {
+  const [id, name, roadAddress, lotAddress, phone, lat, lng] = r;
+  return {
+    id,
+    name,
+    roadAddress,
+    lotAddress: lotAddress || roadAddress,
+    phone: phone || undefined,
+    statusName: '영업중',
+    lat,
+    lng,
+    source: 'business',
+  };
+}
+
+let allPoolsCache: OfficialPool[] | null = null;
+
+/** 서울 + 전국 공공시설 + 전국 인허가 스냅샷. 같은 곳(이름이 같거나 120m 안)은 상세 정보가 있는 쪽만 남긴다. */
+function allPools(): OfficialPool[] {
+  if (allPoolsCache) return allPoolsCache;
+  const detailed = [...SEOUL_POOL_FACILITIES.map(mapSeoulFacility), ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility)];
+  const licensed = dedupeAgainst(
+    detailed.filter((p) => isInKorea(p.lat, p.lng)),
+    LICENSED_POOL_FACILITIES.map(mapLicensed)
+  );
+  allPoolsCache = [...detailed, ...licensed];
+  return allPoolsCache;
+}
+
+function searchLicensed(tokens: string[]): OfficialPool[] {
+  return LICENSED_POOL_FACILITIES.filter((r) => {
+    const haystack = `${r[1]} ${r[2]} ${r[3]}`;
+    return tokens.every((t) => haystack.includes(t));
+  }).map(mapLicensed);
+}
+
 async function fetchByCondition(
   field: 'BPLC_NM' | 'ROAD_NM_ADDR' | 'LOTNO_ADDR',
   query: string,
@@ -193,11 +236,7 @@ function haversineKm(aLat: number, aLng: number, bLat: number, bLng: number): nu
  * 수영장업 인허가 API(business)는 지역 반경 조회를 지원하지 않아 이 확장 대상에선 뺀다 —
  * API에 없는 걸 지어내서 "근처"라고 보여줄 순 없으니까. */
 function findNearbyPools(anchorLat: number, anchorLng: number, excludeIds: Set<string>): OfficialPool[] {
-  const candidates = [
-    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
-    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
-  ];
-  return candidates
+  return allPools()
     .filter((p) => p.lat != null && p.lng != null && !excludeIds.has(p.id))
     .map((p) => ({ pool: p, dist: haversineKm(anchorLat, anchorLng, p.lat as number, p.lng as number) }))
     .filter((x) => x.dist <= NEARBY_RADIUS_KM)
@@ -245,6 +284,11 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   const tokens = query.trim().split(/\s+/).filter(Boolean);
   const primary = tokens[tokens.length - 1];
   const publicResults = [...searchSeoulFacilities(tokens), ...searchPublicFacilities(tokens)];
+
+  if (HAS_SNAPSHOT) {
+    const licensed = dedupeAgainst(publicResults, searchLicensed(tokens)).slice(0, maxResults);
+    return withNearby([...publicResults, ...licensed]).filter((p) => p.source === 'business' || hasUsefulInfo(p));
+  }
 
   if (!API_KEY) return withNearby(publicResults).filter(hasUsefulInfo);
 
@@ -318,13 +362,10 @@ async function fetchRegionPools(term: string): Promise<OfficialPool[]> {
 
 /** 검색한 장소 주변 수영장을 가까운 순으로 돌려준다. API가 실패해도 번들 데이터만으로 결과를 낸다. */
 export async function findPoolsNear(place: PlaceInfo, limit = 40): Promise<OfficialPool[]> {
-  const bundled = [
-    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
-    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
-  ].filter((p) => isInKorea(p.lat, p.lng));
+  const bundled = allPools().filter((p) => isInKorea(p.lat, p.lng));
 
   let business: OfficialPool[] = [];
-  if (API_KEY && place.regionTerms.length > 0) {
+  if (!HAS_SNAPSHOT && API_KEY && place.regionTerms.length > 0) {
     try {
       business = (await Promise.all(place.regionTerms.map(fetchRegionPools))).flat();
     } catch {
@@ -344,14 +385,12 @@ export function getDefaultOfficialPools(
   limit = 30,
   userLocation?: { lat: number; lng: number }
 ): OfficialPool[] {
-  const pools = [
-    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
-    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
-  ]
-    .filter(hasUsefulInfo)
-    .filter((p) => p.lat != null && p.lng != null);
+  const pools = allPools().filter(
+    (p) => p.lat != null && p.lng != null && (p.source === 'business' || hasUsefulInfo(p))
+  );
 
-  if (!userLocation) return pools.slice(0, limit);
+  // 내 위치를 모르면 예전처럼 상세 정보가 있는 곳(서울/공공시설)을 앞에서부터 보여준다.
+  if (!userLocation) return pools.filter(hasUsefulInfo).slice(0, limit);
 
   return pools
     .map((p) => ({
