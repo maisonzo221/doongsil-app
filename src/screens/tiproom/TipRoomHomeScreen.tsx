@@ -29,6 +29,7 @@ import {
   findPoolsNear,
   getDefaultOfficialPools,
   getFreeSwimPools,
+  getPoolsByKeys,
   isPoolDataConfigured,
   mapLinkFor,
   OfficialPool,
@@ -38,6 +39,16 @@ import {
 import { getCurrentUser, UserProfile } from '../../storage/auth';
 import { looksLikeAdminPlace, PlaceInfo } from '../../services/geo';
 import { geocodePlace, reversePlace } from '../../services/placeSearch';
+import { POOL_ENROLLMENTS } from '../../data/poolEnrollment';
+import { FavoritePool, toggleFavoritePool } from '../../storage/favoritePools';
+import {
+  ensureNotificationPermission,
+  refreshEnrollmentNotifications,
+  useEnrollmentAlerts,
+  useFavoritePools,
+} from '../../services/enrollmentAlerts';
+import { dDayLabel, formatPeriod, nextEnrollment } from '../../utils/enrollment';
+import { poolKey } from '../../utils/poolKey';
 
 type Props = NativeStackScreenProps<TipRoomStackParamList, 'TipRoomHome'>;
 
@@ -49,6 +60,24 @@ const TAB_META: Record<Tab, { label: string; emoji: string; desc: string; accent
   pools: { label: '수영장 찾기', emoji: '📍', desc: '전국 수영장을 지도에서 찾아요', accent: colors.blueSea },
   freeSwim: { label: '자유수영', emoji: '🕒', desc: '자유수영 시간표와 요금을 공유해요', accent: colors.ringActivity },
 };
+
+// 저장해둔 관심 수영장을 지도/카드에서 쓰는 모양으로 바꾼다 (번들 데이터에 아직 있으면 그쪽 상세 정보를 쓴다).
+function favoritesToPools(favorites: FavoritePool[]): OfficialPool[] {
+  const live = getPoolsByKeys(favorites.map((f) => f.key));
+  return favorites.map(
+    (f) =>
+      live.get(f.key) ?? {
+        id: `fav-${f.key}`,
+        name: f.name,
+        roadAddress: f.roadAddress,
+        lotAddress: f.lotAddress,
+        phone: f.phone,
+        statusName: '',
+        lat: f.lat,
+        lng: f.lng,
+      }
+  );
+}
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -63,6 +92,11 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [me, setMe] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<BoardPost[]>([]);
   const [poolSearch, setPoolSearch] = useState('');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const favorites = useFavoritePools();
+  const favoriteKeys = useMemo(() => new Set(favorites.map((f) => f.key)), [favorites]);
+  const favoritePools = useMemo(() => favoritesToPools(favorites), [favorites]);
+  const enrollmentAlerts = useEnrollmentAlerts();
 
   const [postModal, setPostModal] = useState(false);
   const [postCategory, setPostCategory] = useState(BOARD_CATEGORIES[0]);
@@ -114,6 +148,14 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (tab !== 'pools') return;
+    if (favoritesOnly) {
+      setPlace(null);
+      setMovedCenter(null);
+      setLoadingOfficial(false);
+      setSearchNote(favoritePools.length > 0 ? `관심 수영장 ${favoritePools.length}곳` : null);
+      setOfficialPools(favoritePools);
+      return;
+    }
     if (!poolSearch.trim()) {
       // 검색 전에도 지도가 켜져있어야 하므로, 기본 수영장 목록으로 미리 채워둔다.
       // GPS 위치를 받아오면(비동기) 거리순으로 다시 정렬돼서 자동으로 업데이트된다.
@@ -185,7 +227,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [tab, poolSearch, userLocation]);
+  }, [tab, poolSearch, userLocation, favoritesOnly, favoritePools]);
 
   // 지도를 끌어서 옮긴 뒤 "이 지역에서 검색"을 누르면, 지도 중심 주변 수영장을 찾는다.
   async function searchHere() {
@@ -251,6 +293,15 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
     }, [reload])
   );
 
+  async function handleToggleFavorite(pool: OfficialPool) {
+    const added = await toggleFavoritePool(pool);
+    if (added) {
+      // 알림은 관심 수영장을 처음 등록할 때 한 번 허용받아 둔다.
+      await ensureNotificationPermission();
+      await refreshEnrollmentNotifications();
+    }
+  }
+
   async function handleSubmitPost() {
     if (!postTitle.trim() || !postBody.trim()) return;
     await createBoardPost(postCategory, postTitle.trim(), postBody.trim());
@@ -289,6 +340,22 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
           <Text style={styles.chapterEmoji}>{TAB_META[tab].emoji}</Text>
           <Text style={[styles.chapterDesc, { color: TAB_META[tab].accent }]}>{TAB_META[tab].desc}</Text>
         </View>
+
+        {enrollmentAlerts.length > 0 && (
+          <TouchableOpacity
+            style={styles.alertBanner}
+            onPress={() => {
+              setTab('pools');
+              setFavoritesOnly(true);
+            }}
+          >
+            <Text style={styles.alertBannerTitle}>
+              🔔 {enrollmentAlerts[0].enrollment.poolName} 신규회원 접수 {dDayLabel(enrollmentAlerts[0])}
+              {enrollmentAlerts.length > 1 ? ` 외 ${enrollmentAlerts.length - 1}곳` : ''}
+            </Text>
+            <Text style={styles.alertBannerBody}>{formatPeriod(enrollmentAlerts[0].enrollment)} · 눌러서 관심 수영장 보기</Text>
+          </TouchableOpacity>
+        )}
 
         {disabled ? (
           <View style={styles.disabledNotice}>
@@ -333,7 +400,9 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.empty}>
-                  {!isPoolDataConfigured || !isNaverMapConfigured
+                  {favoritesOnly
+                    ? '아직 관심 수영장이 없어요. 수영장 카드의 ♡를 눌러 등록하면 신규회원 모집 알림을 받을 수 있어요.'
+                    : !isPoolDataConfigured || !isNaverMapConfigured
                     ? '수영장 검색 기능을 준비하고 있어요. 조금만 기다려주세요!'
                     : loadingOfficial
                     ? ''
@@ -355,6 +424,16 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                   returnKeyType="search"
                 />
                 {(loadingOfficial || areaSearching) && <ActivityIndicator color={colors.primary} size="small" />}
+                <TouchableOpacity
+                  onPress={() => setFavoritesOnly((v) => !v)}
+                  hitSlop={8}
+                  style={[styles.favToggle, favoritesOnly && styles.favToggleActive]}
+                  accessibilityLabel="관심 수영장만 보기"
+                >
+                  <Text style={[styles.favToggleText, favoritesOnly && styles.favToggleTextActive]}>
+                    {favoritesOnly ? '♥' : '♡'} {favorites.length}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
 
@@ -393,6 +472,10 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                     .filter(Boolean)
                     .join(' · ');
                   const lines = selected ? 3 : 1;
+                  const key = poolKey(item);
+                  const isFav = favoriteKeys.has(key);
+                  const enrollment = nextEnrollment(key, POOL_ENROLLMENTS);
+                  const enrollmentAlert = enrollmentAlerts.find((a) => a.enrollment === enrollment);
                   return (
                     <TouchableOpacity
                       style={[
@@ -419,11 +502,31 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
                           </Text>
                         </View>
                         <Text style={styles.poolStatus}>{item.statusName}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleToggleFavorite(item)}
+                          hitSlop={10}
+                          accessibilityLabel={isFav ? '관심 수영장 해제' : '관심 수영장 등록'}
+                        >
+                          <Text style={[styles.heart, isFav && styles.heartActive]}>{isFav ? '♥' : '♡'}</Text>
+                        </TouchableOpacity>
                       </View>
                       <Text style={[styles.poolMeta, selected && styles.poolMetaEnlarged]} numberOfLines={selected ? 2 : 1}>
                         {item.roadAddress}
                       </Text>
 
+                      {!!enrollment && (
+                        <View style={[styles.enrollBox, !!enrollmentAlert && styles.enrollBoxAlert]}>
+                          <Text style={[styles.enrollTitle, !!enrollmentAlert && styles.enrollTitleAlert]}>
+                            {enrollmentAlert ? `🔔 ${dDayLabel(enrollmentAlert)} · ` : ''}
+                            신규회원 접수{enrollment.label ? ` (${enrollment.label})` : ''}
+                          </Text>
+                          <Text style={styles.enrollBody}>
+                            {formatPeriod(enrollment)}
+                            {enrollment.method ? ` · ${enrollment.method}` : ''}
+                          </Text>
+                          <Text style={styles.enrollVerified}>전화 확인 {enrollment.verifiedAt}</Text>
+                        </View>
+                      )}
                       {!!operHours && (
                         <View style={styles.poolDetailRow}>
                           <Text style={[styles.poolDetailLabel, selected && styles.poolDetailLabelEnlarged]}>운영시간</Text>
@@ -802,6 +905,21 @@ const styles = StyleSheet.create({
   poolFreeSwim: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12, marginTop: 4 },
   poolActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
   poolAction: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 12 },
+  heart: { fontSize: 22, color: colors.textMuted, lineHeight: 24 },
+  heartActive: { color: colors.alert },
+  favToggle: { borderRadius: radius.pill, paddingHorizontal: spacing.xs, paddingVertical: 3, backgroundColor: colors.cardSoft },
+  favToggleActive: { backgroundColor: colors.alert },
+  favToggleText: { fontFamily: fonts.bold, fontSize: 13, color: colors.alert },
+  favToggleTextActive: { color: colors.white },
+  alertBanner: { backgroundColor: colors.alert, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  alertBannerTitle: { fontFamily: fonts.bold, color: colors.white, fontSize: 14 },
+  alertBannerBody: { fontFamily: fonts.regular, color: colors.white, fontSize: 12, marginTop: 2 },
+  enrollBox: { backgroundColor: colors.cardSoft, borderRadius: radius.sm, padding: spacing.xs, marginTop: spacing.xs },
+  enrollBoxAlert: { backgroundColor: colors.alertSoft, borderWidth: 1, borderColor: colors.alert },
+  enrollTitle: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 12 },
+  enrollTitleAlert: { color: colors.alert },
+  enrollBody: { fontFamily: fonts.semibold, color: colors.text, fontSize: 12, marginTop: 2 },
+  enrollVerified: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 10, marginTop: 2 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(11,42,74,0.4)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   modalCard: { width: '100%', backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.lg },
   modalCardTall: { maxHeight: '85%' },

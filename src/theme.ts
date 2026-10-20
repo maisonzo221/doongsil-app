@@ -4,6 +4,8 @@ export const colors = {
   aqua: '#35C3D6', // 장식용 하이라이트/그라데이션 (글씨 배경으로는 쓰지 않는다)
   blueSea: '#0B5F8F', // 보조 강조 — 작은 글씨에 쓰는 진한 바다색
   deepSea: '#0B2A4A', // 가장 진한 글씨/눌림 상태
+  alert: '#E5243B', // 모집 알림 전용 빨강 — 흰 글씨와 대비 4.5:1
+  alertSoft: '#FDE8EB',
   coral: '#FF7E5F', // 브랜드 포인트 — 지도 핀/배지 등 장식용 (글씨 색으로는 대비 부족)
 
   background: '#F1FAFB',

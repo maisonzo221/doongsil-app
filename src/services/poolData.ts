@@ -9,6 +9,8 @@ import { PUBLIC_POOL_FACILITIES as GENERATED_PUBLIC_POOLS } from '../data/public
 import { MANUAL_POOL_FACILITIES } from '../data/manualPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
 import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
+import { POOL_EXCLUDED_KEYS } from '../data/poolEnrollment';
+import { poolKey } from '../utils/poolKey';
 import { dedupeAgainst, isInKorea, PlaceInfo, rankNearby } from './geo';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
@@ -93,6 +95,10 @@ function mapItem(item: any): OfficialPool {
 // 공공시설개방정보 + 손으로 추가한 공공 수영장.
 const PUBLIC_POOL_FACILITIES = [...GENERATED_PUBLIC_POOLS, ...MANUAL_POOL_FACILITIES];
 
+// 전화로 확인해보니 수영장이 없거나 닫은 곳은 어느 경로로도 안 나오게 거른다.
+const EXCLUDED_KEYS = new Set<string>(POOL_EXCLUDED_KEYS);
+const isVisible = (p: OfficialPool): boolean => EXCLUDED_KEYS.size === 0 || !EXCLUDED_KEYS.has(poolKey(p));
+
 function mapPublicFacility(f: (typeof PUBLIC_POOL_FACILITIES)[number]): OfficialPool {
   return {
     id: f.id,
@@ -120,7 +126,9 @@ function searchPublicFacilities(tokens: string[]): OfficialPool[] {
   return PUBLIC_POOL_FACILITIES.filter((f) => {
     const haystack = `${f.name} ${f.roadAddress} ${f.lotAddress}`;
     return tokens.every((t) => haystack.includes(t));
-  }).map(mapPublicFacility);
+  })
+    .map(mapPublicFacility)
+    .filter(isVisible);
 }
 
 function mapSeoulFacility(f: (typeof SEOUL_POOL_FACILITIES)[number]): OfficialPool {
@@ -150,7 +158,9 @@ function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
   return SEOUL_POOL_FACILITIES.filter((f) => {
     const haystack = `${f.name} ${f.district ?? ''} ${f.roadAddress}`;
     return tokens.every((t) => haystack.includes(t));
-  }).map(mapSeoulFacility);
+  })
+    .map(mapSeoulFacility)
+    .filter(isVisible);
 }
 
 // ───────── 전국 인허가 수영장 스냅샷 (scripts/fetch-pool-data.mjs로 생성) ─────────
@@ -178,10 +188,13 @@ let allPoolsCache: OfficialPool[] | null = null;
 /** 서울 + 전국 공공시설 + 전국 인허가 스냅샷. 같은 곳(이름이 같거나 120m 안)은 상세 정보가 있는 쪽만 남긴다. */
 function allPools(): OfficialPool[] {
   if (allPoolsCache) return allPoolsCache;
-  const detailed = [...SEOUL_POOL_FACILITIES.map(mapSeoulFacility), ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility)];
+  const detailed = [
+    ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
+    ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
+  ].filter(isVisible);
   const licensed = dedupeAgainst(
     detailed.filter((p) => isInKorea(p.lat, p.lng)),
-    LICENSED_POOL_FACILITIES.map(mapLicensed)
+    LICENSED_POOL_FACILITIES.map(mapLicensed).filter(isVisible)
   );
   allPoolsCache = [...detailed, ...licensed];
   return allPoolsCache;
@@ -191,7 +204,9 @@ function searchLicensed(tokens: string[]): OfficialPool[] {
   return LICENSED_POOL_FACILITIES.filter((r) => {
     const haystack = `${r[1]} ${r[2]} ${r[3]}`;
     return tokens.every((t) => haystack.includes(t));
-  }).map(mapLicensed);
+  })
+    .map(mapLicensed)
+    .filter(isVisible);
 }
 
 async function fetchByCondition(
@@ -213,7 +228,7 @@ async function fetchByCondition(
   return (Array.isArray(items) ? items : [items])
     .filter(Boolean)
     .map(mapItem)
-    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName));
+    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName) && isVisible(p));
 }
 
 function matchesAllTokens(pool: OfficialPool, tokens: string[]): boolean {
@@ -359,7 +374,7 @@ async function fetchRegionPools(term: string): Promise<OfficialPool[]> {
   [...firsts, ...rest]
     .flatMap((r) => r.items)
     .map(mapItem)
-    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName) && isInKorea(p.lat, p.lng))
+    .filter((p) => !CLOSED_STATUS_PATTERN.test(p.statusName) && isInKorea(p.lat, p.lng) && isVisible(p))
     .forEach((p) => byId.set(p.id, p));
   const result = Array.from(byId.values());
   regionCache.set(term, result);
@@ -416,10 +431,29 @@ export function getFreeSwimPools(query?: string): OfficialPool[] {
   const all = [
     ...SEOUL_POOL_FACILITIES.map(mapSeoulFacility),
     ...PUBLIC_POOL_FACILITIES.map(mapPublicFacility),
-  ].filter((p) => !!p.freeSwimInfo);
+  ].filter((p) => !!p.freeSwimInfo && isVisible(p));
 
   if (tokens.length === 0) return all;
   return all.filter((p) => matchesAllTokens(p, tokens));
+}
+
+let keyIndexCache: Map<string, OfficialPool> | null = null;
+
+/** 관심 수영장처럼 poolKey로 저장해둔 수영장을 현재 번들 데이터에서 다시 찾는다. 없는 키는 건너뛴다. */
+export function getPoolsByKeys(keys: string[]): Map<string, OfficialPool> {
+  if (!keyIndexCache) {
+    keyIndexCache = new Map();
+    for (const p of allPools()) {
+      const k = poolKey(p);
+      if (!keyIndexCache.has(k)) keyIndexCache.set(k, p);
+    }
+  }
+  const out = new Map<string, OfficialPool>();
+  for (const k of keys) {
+    const p = keyIndexCache.get(k);
+    if (p) out.set(k, p);
+  }
+  return out;
 }
 
 /** 외부 지도 앱(카카오맵)으로 여는 링크. 카카오맵 API 키 없이도 작동한다.

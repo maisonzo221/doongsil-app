@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -18,6 +18,7 @@ import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
 import SettingsScreen from '../screens/social/SettingsScreen';
 import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
+import CenterTabIcon from '../components/CenterTabIcon';
 import { colors } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList } from './socialTypes';
@@ -25,6 +26,7 @@ import { TipRoomStackParamList } from './tipRoomTypes';
 import { FEATURE_FLAGS } from '../config/featureFlags';
 import { getCurrentUser, onAuthChange, updatePushToken, UserProfile } from '../storage/auth';
 import { registerForPushNotificationsAsync } from '../services/pushNotifications';
+import { useEnrollmentAlerts, useEnrollmentNotificationSync } from '../services/enrollmentAlerts';
 import { getGroupById } from '../storage/social';
 import { navigateToChatRoom, navigationRef } from './navigationRef';
 
@@ -117,6 +119,9 @@ function TipRoomStackNavigator() {
 }
 
 function AppTabs() {
+  const enrollmentAlerts = useEnrollmentAlerts();
+  const hasEnrollmentAlert = enrollmentAlerts.length > 0;
+  useEnrollmentNotificationSync();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -129,11 +134,7 @@ function AppTabs() {
           const Icon = TAB_ICON[route.name as keyof RootTabParamList];
           const isCenter = route.name === CENTER_TAB;
           if (isCenter) {
-            return (
-              <View style={styles.centerIconWrap}>
-                <Icon color={colors.white} size={28} />
-              </View>
-            );
+            return <CenterTabIcon Icon={Icon} alerting={hasEnrollmentAlert} />;
           }
           return <Icon color={color} size={28} />;
         },
@@ -194,19 +195,3 @@ export default function RootNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  centerIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -20,
-    shadowColor: colors.primaryPressed,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-});
