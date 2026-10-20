@@ -156,15 +156,25 @@ function bundledRows(): Row[] {
 // ───────── 2) 오픈스트리트맵 ─────────
 const OVERPASS = (process.env.OVERPASS_URL ? [process.env.OVERPASS_URL] : [
   'https://overpass-api.de/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ]);
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+// 구역마다 시작 서버를 바꿔서, 한 서버가 연결을 끊어도 다른 서버로 넘어가게 한다.
+let overpassStart = 0;
+
+function why(e: unknown): string {
+  const err = e as { message?: string; cause?: { code?: string; message?: string } };
+  return `${err.message ?? e}${err.cause?.code ? ` [${err.cause.code}]` : ''}`;
+}
 
 async function overpass(query: string): Promise<any[]> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const url = OVERPASS[attempt % OVERPASS.length];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const url = OVERPASS[(attempt + overpassStart) % OVERPASS.length];
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -176,7 +186,7 @@ async function overpass(query: string): Promise<any[]> {
       const json: any = await res.json();
       return json.elements ?? [];
     } catch (e) {
-      lastErr = e;
+      lastErr = new Error(`${new URL(url).host}: ${why(e)}`);
       await sleep(3000 * (attempt + 1));
     }
   }
@@ -241,7 +251,9 @@ async function collectOsm(): Promise<{ items: OsmItem[]; failedTiles: number }> 
       console.log(`→ ${items.length}건`);
     } catch (err) {
       failedTiles++;
-      console.log(`→ 실패(${(err as Error).message}), 나중에 다시 돌리면 이 구역만 받아요`);
+      overpassStart++;
+      console.log(`→ 실패(마지막 오류 ${(err as Error).message}), 나중에 다시 돌리면 이 구역만 받아요`);
+      await sleep(8000);
     }
     await sleep(1000);
   }
