@@ -200,7 +200,15 @@ interface OsmItem {
   tags: Record<string, string>;
 }
 
+const OSM_CACHE = path.join(OUT_DIR, 'osm-cache.json');
+
 async function collectOsm(): Promise<OsmItem[]> {
+  // 한 번 받아두면 다시 돌릴 때 재사용한다(20분 걸리는 일이라). 새로 받으려면 --refresh-osm.
+  if (!args.has('--refresh-osm') && fs.existsSync(OSM_CACHE)) {
+    const cached: OsmItem[] = JSON.parse(fs.readFileSync(OSM_CACHE, 'utf8'));
+    console.log(`  저장해둔 오픈스트리트맵 결과 ${cached.length}건 사용 (새로 받으려면 --refresh-osm)`);
+    return cached;
+  }
   const seen = new Map<string, OsmItem>();
   const list = tiles();
   for (let i = 0; i < list.length; i++) {
@@ -227,7 +235,9 @@ async function collectOsm(): Promise<OsmItem[]> {
     console.log(`→ ${added}건`);
     await sleep(1500);
   }
-  return Array.from(seen.values());
+  const result = Array.from(seen.values());
+  fs.writeFileSync(OSM_CACHE, JSON.stringify(result));
+  return result;
 }
 
 function osmExcluded(it: OsmItem): boolean {
@@ -310,7 +320,9 @@ async function collectPublicApi(key: string): Promise<Record<string, any>[]> {
       try {
         const res = await fetch(u, { signal: AbortSignal.timeout(60000) });
         const text = await res.text();
-        body = JSON.parse(text)?.response?.body;
+        const parsed = JSON.parse(text);
+        // 응답이 {response:{body}} 모양일 때도, {header, body} 모양일 때도 있다.
+        body = parsed?.response?.body ?? parsed?.body;
         if (body) break;
         throw new Error(`응답 형식이 달라요: ${text.slice(0, 120)}`);
       } catch (e) {
@@ -466,11 +478,13 @@ async function main() {
       let weak = 0;
       let dup = 0;
       for (const rec of recs) {
-        const name = pick(rec, /^(fclty|openFclty|facility).*(nm|name)$/i, /(fclty|fcltyplc|plc|place).*nm$/i, /nm$/i);
-        if (!name || NOT_A_CLUB.test(name)) continue;
-        const text = Object.values(rec).filter((v) => typeof v === 'string').join(' ');
-        const isStrong = /수영/.test(name) || /수영장/.test(text) && /수영장/.test(name);
-        const isWeak = !isStrong && WEAK_PUBLIC_NAME.test(name);
+        const facility = pick(rec, /^(open)?fclty.*nm$/i, /fclty.*name$/i);
+        const placeNm = pick(rec, /(place|plc).*nm$/i);
+        if (!facility || NOT_A_CLUB.test(facility)) continue;
+        // 시설명이나 개방 장소명에 "수영"이 있으면 수영장 근거가 확실한 것으로 본다.
+        const isStrong = /수영/.test(facility) || /수영/.test(placeNm);
+        const name = isStrong && !/수영/.test(facility) ? `${facility} ${placeNm}` : facility;
+        const isWeak = !isStrong && WEAK_PUBLIC_NAME.test(facility);
         if (!isStrong && !isWeak) continue;
         const lat = Number(pick(rec, /latitude|lat$/i));
         const lng = Number(pick(rec, /longitude|lng$|lon$/i));
@@ -494,6 +508,7 @@ async function main() {
         if (isStrong) strong++;
         else weak++;
       }
+      console.log(`  예: ${recs.slice(0, 1).map((r) => JSON.stringify(r).slice(0, 300)).join('')}`);
       const msg = `공공시설개방정보 ${recs.length}건: 수영장 근거 있음 +${strong}, 수영장 여부 확인필요 +${weak}, 이미 있음 ${dup}`;
       console.log(msg);
       report.push(msg);
