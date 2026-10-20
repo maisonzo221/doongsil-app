@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -56,6 +57,26 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [inviteModal, setInviteModal] = useState(false);
   const [invitableFriends, setInvitableFriends] = useState<Friend[]>([]);
   const [invitingId, setInvitingId] = useState<string | null>(null);
+
+  // 키보드가 올라오면 입력창이 키보드 위로 올라오고, 마지막 메시지가 항상 입력창 바로 위에 보이게 한다.
+  // KeyboardAvoidingView는 자기 위쪽에 있는 것(헤더/상태바)의 높이를 모르면 그만큼 덜 올려서 입력창이
+  // 키보드에 가려진다. 그래서 이 화면이 화면 위에서 얼마나 내려와 있는지(창 기준 y)를 직접 재서 넘긴다.
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const frameRef = useRef<View>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  // 사용자가 위로 올려서 지난 대화를 읽는 중이면 새 메시지가 와도 끌어내리지 않는다.
+  const stickToBottom = useRef(true);
+  const scrollToBottom = useCallback((animated: boolean) => {
+    listRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  useEffect(() => {
+    const event = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(event, () => {
+      if (stickToBottom.current) setTimeout(() => scrollToBottom(true), 50);
+    });
+    return () => sub.remove();
+  }, [scrollToBottom]);
 
   const isOwner = !!myId && myId === ownerId;
 
@@ -148,6 +169,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
     // 반응이 느리게 느껴져서, 일단 화면에 바로 띄워두고(낙관적 업데이트) 실제
     // 전송은 뒤에서 진행한다. 실패하면 이 임시 메시지만 지우고 입력창을 복원한다.
     const tempId = `temp-${Date.now()}`;
+    stickToBottom.current = true;
     setDraft('');
     setMessages((prev) => [
       ...prev,
@@ -237,17 +259,39 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScreenBackground>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScreenBackground edges={['left', 'right']}>
+      <View
+        ref={frameRef}
+        style={styles.flex}
+        onLayout={() => frameRef.current?.measureInWindow((_x, y) => setKeyboardOffset(y))}
+      >
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={keyboardOffset}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{groupName}</Text>
         </View>
 
         <FlatList
+          ref={listRef}
           style={styles.flex}
           data={messages}
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => stickToBottom.current && scrollToBottom(false)}
+          onLayout={() => stickToBottom.current && scrollToBottom(false)}
+          onScrollEndDrag={(e) => {
+            const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+            stickToBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+          }}
+          onMomentumScrollEnd={(e) => {
+            const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+            stickToBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+          }}
           renderItem={({ item }) => {
             const mine = item.senderId === myId;
             return (
@@ -284,12 +328,16 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
             placeholderTextColor={colors.textMuted}
             value={draft}
             onChangeText={setDraft}
+            returnKeyType="send"
+            blurOnSubmit={false}
+            onSubmitEditing={handleSend}
           />
           <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
             <Text style={styles.sendBtnText}>전송</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </View>
 
       <Modal visible={memberModal} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
