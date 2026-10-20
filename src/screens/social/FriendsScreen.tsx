@@ -272,7 +272,8 @@ export default function FriendsScreen({ navigation, route }: Props) {
           ))}
         </View>
 
-        <View style={styles.flex} {...tabPanResponder.panHandlers}>
+        {/* 수톡 탭에서는 방을 밀어서 나가는 동작과 겹치므로, 좌우로 밀어 탭을 넘기는 기능을 끈다. */}
+        <View style={styles.flex} {...(subTab === 'sutok' ? {} : tabPanResponder.panHandlers)}>
         {subTab === 'sutok' ? (
           <GroupsScreen kind="sutok" navigation={navigation} />
         ) : subTab === 'toktok' ? (

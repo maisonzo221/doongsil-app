@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import MessageBubble from '../../components/MessageBubble';
+import { useLeaveRoom } from '../../components/LeaveRoomFlow';
 import { MembersIcon } from '../../components/icons/TabIcons';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
@@ -31,7 +32,6 @@ import {
   inviteLinkFor,
   inviteMemberToGroup,
   kickMember,
-  leaveGroup,
   ProfanityBlockedError,
   sendTextMessage,
   shareRecordToGroup,
@@ -248,23 +248,14 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
     ]);
   }
 
+  const { requestLeave, leaveElement } = useLeaveRoom(() => {
+    setMemberModal(false);
+    navigation.goBack();
+  });
+
   function handleLeave() {
-    if (isOwner) {
-      Alert.alert('나갈 수 없어요', '방장은 먼저 다른 멤버에게 방장을 위임한 뒤 나갈 수 있어요.');
-      return;
-    }
-    Alert.alert(`${roomLabel}방 나가기`, '정말 나가시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '나가기',
-        style: 'destructive',
-        onPress: async () => {
-          await leaveGroup(groupId);
-          setMemberModal(false);
-          navigation.goBack();
-        },
-      },
-    ]);
+    setMemberModal(false);
+    requestLeave({ id: groupId, name: groupName, roomLabel });
   }
 
   return (
@@ -337,6 +328,8 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
         </View>
       </KeyboardAvoidingView>
       </View>
+
+      {leaveElement}
 
       <Modal visible={memberModal} transparent animationType="fade">
         <View style={styles.modalBackdrop}>

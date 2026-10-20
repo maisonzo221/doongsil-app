@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Swipeable } from 'react-native-gesture-handler';
+import { useLeaveRoom } from '../../components/LeaveRoomFlow';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList, RoomKind } from '../../navigation/socialTypes';
@@ -47,6 +49,11 @@ export default function GroupsScreen({ kind, navigation }: Props) {
   const [nameDraft, setNameDraft] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<Set<string>>(new Set());
   const [joinCodeDraft, setJoinCodeDraft] = useState('');
+  // 수톡 방을 오른쪽에서 왼쪽으로 밀면 나타나는 "대화방 나가기". 열려 있는 줄은 하나만 유지한다.
+  const rows = useRef(new Map<string, Swipeable>());
+  const { requestLeave, leaveElement } = useLeaveRoom(() => {
+    reload();
+  });
 
   const reload = useCallback(async () => {
     const [user, groupList] = await Promise.all([getCurrentUser(), getGroups(kind)]);
@@ -146,33 +153,69 @@ export default function GroupsScreen({ kind, navigation }: Props) {
               </TouchableOpacity>
             </View>
           }
-          renderItem={({ item }) => (
-            <View style={styles.groupCard}>
-              <TouchableOpacity
-                style={styles.groupMain}
-                onPress={() =>
-                  navigation.navigate('ChatRoom', {
-                    groupId: item.id,
-                    groupName: item.name,
-                    ownerId: item.ownerId,
-                    roomKind: kind,
-                  })
-                }
-              >
-                <View style={styles.groupNameRow}>
-                  <Text style={styles.groupName}>{item.name}</Text>
-                  {item.ownerId === me?.id && <Text style={styles.ownerCrown}>👑</Text>}
-                </View>
-                <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.shareBtn} onPress={() => handleShareInvite(item)}>
-                <Text style={styles.shareBtnText}>초대 링크 공유</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          renderItem={({ item }) => {
+            const card = (
+              <View style={styles.groupCard}>
+                <TouchableOpacity
+                  style={styles.groupMain}
+                  onPress={() =>
+                    navigation.navigate('ChatRoom', {
+                      groupId: item.id,
+                      groupName: item.name,
+                      ownerId: item.ownerId,
+                      roomKind: kind,
+                    })
+                  }
+                >
+                  <View style={styles.groupNameRow}>
+                    <Text style={styles.groupName}>{item.name}</Text>
+                    {item.ownerId === me?.id && <Text style={styles.ownerCrown}>👑</Text>}
+                  </View>
+                  <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.shareBtn} onPress={() => handleShareInvite(item)}>
+                  <Text style={styles.shareBtnText}>초대 링크 공유</Text>
+                </TouchableOpacity>
+              </View>
+            );
+            // 톡톡은 예전처럼 그대로, 수톡만 밀어서 나가기를 지원한다.
+            if (kind !== 'sutok') return <View style={styles.groupRow}>{card}</View>;
+            return (
+              <View style={styles.groupRow}>
+                <Swipeable
+                  ref={(r) => {
+                    if (r) rows.current.set(item.id, r);
+                    else rows.current.delete(item.id);
+                  }}
+                  overshootRight={false}
+                  friction={2}
+                  rightThreshold={40}
+                  onSwipeableWillOpen={() => {
+                    // 다른 줄이 열려 있으면 닫는다.
+                    rows.current.forEach((r, id) => id !== item.id && r.close());
+                  }}
+                  renderRightActions={(_progress, _drag, swipeable) => (
+                    <TouchableOpacity
+                      style={styles.leaveAction}
+                      onPress={() => {
+                        swipeable.close();
+                        requestLeave({ id: item.id, name: item.name, roomLabel: label });
+                      }}
+                    >
+                      <Text style={styles.leaveActionText}>대화방{'\n'}나가기</Text>
+                    </TouchableOpacity>
+                  )}
+                >
+                  {card}
+                </Swipeable>
+              </View>
+            );
+          }}
           ListEmptyComponent={<Text style={styles.empty}>아직 {label}이 없어요.</Text>}
         />
       )}
+
+      {leaveElement}
 
       {/* 만들기 */}
       <Modal visible={createModal} transparent animationType="fade">
@@ -269,12 +312,24 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   addRowText: { fontFamily: fonts.semibold, color: colors.primary, fontSize: 13 },
+  groupRow: { marginBottom: spacing.hairline + 4 },
   groupCard: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
-    marginBottom: spacing.hairline + 4,
     overflow: 'hidden',
   },
+  // 카드 오른쪽에 붙어 나타나는 빨간 영역
+  leaveAction: {
+    width: 92,
+    backgroundColor: colors.alert,
+    borderTopRightRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+    marginLeft: -radius.md,
+    paddingLeft: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaveActionText: { fontFamily: fonts.bold, color: colors.white, fontSize: 13, textAlign: 'center' },
   groupMain: { padding: spacing.sm },
   groupNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
   groupName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },

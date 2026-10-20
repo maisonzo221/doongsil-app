@@ -211,10 +211,24 @@ export async function transferOwnership(groupId: string, newOwnerId: string): Pr
   if (error) throw error;
 }
 
-/** 수톡방에서 나간다. 방장은 먼저 방장 위임부터 해야 한다. */
+/** 수톡방에서 나간다. (방장이 아니거나, 이미 방장을 넘긴 뒤에 쓴다) */
 export async function leaveGroup(groupId: string): Promise<void> {
   const { error } = await supabase.rpc('leave_group', { target_group_id: groupId });
   if (error) throw error;
+}
+
+/** 방장이 위임 없이 그냥 나간다: 가장 먼저 들어온 멤버가 자동으로 방장이 되고, 혼자 남았으면 방이 사라진다.
+ * 서버(migration_011)가 아직 이 동작을 모르는 옛 버전이면, 앱이 대신 자동 위임 후 나간다. */
+export async function leaveGroupAsOwner(groupId: string, myId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_group', { target_group_id: groupId });
+  if (!error) return;
+  if (!error.message?.includes('owner_must_transfer_first')) throw error;
+
+  const members = await getGroupMembers(groupId);
+  const successor = members.find((m) => m.id !== myId);
+  if (!successor) throw new Error('sole_owner_needs_server_update');
+  await transferOwnership(groupId, successor.id);
+  await leaveGroup(groupId);
 }
 
 export async function createGroup(name: string, memberIds: string[], kind: RoomKind): Promise<string> {
@@ -240,8 +254,9 @@ export function inviteLinkFor(inviteCode: string): string {
 export async function getGroupMembers(groupId: string): Promise<Friend[]> {
   const { data, error } = await supabase
     .from('chat_group_members')
-    .select('profiles(id, nickname_ko, nickname_en)')
-    .eq('group_id', groupId);
+    .select('joined_at, profiles(id, nickname_ko, nickname_en)')
+    .eq('group_id', groupId)
+    .order('joined_at', { ascending: true });
   if (error || !data) return [];
   return (data as any[])
     .map((row) => row.profiles)

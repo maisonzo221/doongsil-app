@@ -99,8 +99,14 @@ async function writeCache(cacheKey: string, entry: CachedEntry): Promise<void> {
 const BANNED_CONTENT_PATTERN =
   /(야동|성인방송|19금|노출방송|누드|섹스|자위|음란|마약|필로폰|대마초|도박|불법토토|토토사이트|카지노|베팅사이트|porn|xxx|nsfw|onlyfans|nude|naked girl|sex tape|cocaine|marijuana|weed strain|gambling site|casino bonus)/i;
 
+// "수영"이 소녀시대 멤버(배우/가수 최수영) 이름이기도 해서, 수영(swimming) 검색에 그 사람 영상이 섞여 들어온다.
+// 이름이 확실한 표현만 걸러낸다 — "배우 수영"처럼 애매한 건 "수영 배우기"(swimming 강습) 영상을 같이 막을 수 있어 뺐다.
+const NOT_SWIMMING_PERSON_PATTERN = /(소녀시대|최수영|snsd|girls['’]?\s*generation|choi\s*soo-?young|sooyoung|배우\s*수영\s*(드라마|인터뷰|화보|근황|출연|열애|결혼|예능|영화)|수영\s*(배우|가수)\s*(인터뷰|화보|근황|출연|드라마|예능|영화))/i;
+const SEARCH_EXCLUDE_TERMS = ' -소녀시대 -최수영';
+
 function isBannedContent(title: string, channelTitle: string, description: string): boolean {
-  return BANNED_CONTENT_PATTERN.test(`${title} ${channelTitle} ${description}`);
+  const text = `${title} ${channelTitle} ${description}`;
+  return BANNED_CONTENT_PATTERN.test(text) || NOT_SWIMMING_PERSON_PATTERN.test(text);
 }
 
 const HANGUL_PATTERN = /[가-힣]/;
@@ -122,7 +128,7 @@ async function fetchSwimVideos(
   let url =
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}` +
     `&videoEmbeddable=true&safeSearch=strict&regionCode=KR` +
-    `&q=${encodeURIComponent(query)}&relevanceLanguage=ko&key=${API_KEY}`;
+    `&q=${encodeURIComponent(query + SEARCH_EXCLUDE_TERMS)}&relevanceLanguage=ko&key=${API_KEY}`;
   if (recentDays) {
     const publishedAfter = new Date(Date.now() - recentDays * 24 * 60 * 60 * 1000).toISOString();
     url += `&order=date&publishedAfter=${publishedAfter}`;
