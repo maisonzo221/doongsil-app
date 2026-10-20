@@ -41,3 +41,6 @@ yarn-error.*
 /ios
 /android
 supabase/.temp/
+
+# 수집 스크립트 결과물(전화 확인 리스트 등)
+scripts/out/

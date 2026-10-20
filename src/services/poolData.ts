@@ -7,6 +7,8 @@
 import proj4 from 'proj4';
 import { PUBLIC_POOL_FACILITIES as GENERATED_PUBLIC_POOLS } from '../data/publicPoolFacilities';
 import { MANUAL_POOL_FACILITIES } from '../data/manualPoolFacilities';
+import { CANDIDATE_POOL_FACILITIES } from '../data/candidatePoolFacilities';
+import { VERIFIED_POOL_FACILITIES } from '../data/verifiedPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
 import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
 import { POOL_EXCLUDED_KEYS } from '../data/poolEnrollment';
@@ -92,8 +94,13 @@ function mapItem(item: any): OfficialPool {
   };
 }
 
-// 공공시설개방정보 + 손으로 추가한 공공 수영장.
-const PUBLIC_POOL_FACILITIES = [...GENERATED_PUBLIC_POOLS, ...MANUAL_POOL_FACILITIES];
+// 공공시설개방정보 + 손으로 추가/전화로 확인한 수영장 + 수집한 후보(오픈스트리트맵 등).
+const PUBLIC_POOL_FACILITIES = [
+  ...GENERATED_PUBLIC_POOLS,
+  ...MANUAL_POOL_FACILITIES,
+  ...VERIFIED_POOL_FACILITIES,
+  ...CANDIDATE_POOL_FACILITIES,
+];
 
 // 전화로 확인해보니 수영장이 없거나 닫은 곳은 어느 경로로도 안 나오게 거른다.
 const EXCLUDED_KEYS = new Set<string>(POOL_EXCLUDED_KEYS);
@@ -277,8 +284,8 @@ function withNearby(results: OfficialPool[]): OfficialPool[] {
 // 홈페이지도 전혀 없다 — 사용자가 눌러도 전화 말고는 할 게 없어서 불편하기만 하다.
 // 운영시간·요금·홈페이지·규모·자유수영·부대시설 중 하나도 없는 결과는 검색 결과에서 뺀다.
 function hasUsefulInfo(pool: OfficialPool): boolean {
-  // 손으로 넣은 수영장은 직접 확인해서 넣은 거라 세부 정보가 비어 있어도 보여준다.
-  if (pool.id.startsWith('manual-')) return true;
+  // 손으로 넣거나 수집한 후보 수영장은 세부 정보가 비어 있어도 보여준다.
+  if (/^(manual|verified|cand)-/.test(pool.id)) return true;
   return !!(
     pool.homepageUrl ||
     pool.feeText ||
