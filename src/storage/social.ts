@@ -39,6 +39,8 @@ export interface ChatMessage {
   text?: string;
   sharedSummary?: string;
   createdAt: string;
+  /** 내가 보낸 임시 메시지가 실제 메시지로 바뀔 때 화면에서 같은 말풍선으로 유지하기 위한 키. */
+  localKey?: string;
 }
 
 function displayName(p: { nickname_ko?: string | null; nickname_en?: string | null }): string {

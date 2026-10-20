@@ -17,6 +17,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import MessageBubble from '../../components/MessageBubble';
 import { MembersIcon } from '../../components/icons/TabIcons';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
@@ -66,6 +67,11 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   // 사용자가 위로 올려서 지난 대화를 읽는 중이면 새 메시지가 와도 끌어내리지 않는다.
   const stickToBottom = useRef(true);
+  // 방금 새로 생긴 메시지(내가 보냈거나 실시간으로 도착한 것)만 떠오르는 효과를 보여준다. 처음 불러온 대화는 그대로 보인다.
+  const freshKeys = useRef(new Set<string>());
+  const handleAnimated = useCallback((key: string) => {
+    freshKeys.current.delete(key);
+  }, []);
   const scrollToBottom = useCallback((animated: boolean) => {
     listRef.current?.scrollToEnd({ animated });
   }, []);
@@ -144,19 +150,21 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
     const unsubscribe = subscribeToMessages(groupId, (message) => {
       setMessages((prev) => {
         if (prev.some((m) => m.id === message.id)) return prev;
-        // 내가 방금 낙관적으로 먼저 화면에 띄워둔 임시 메시지가 있으면, 실제 서버
-        // 메시지가 도착했을 때 그걸로 바꿔치기한다 (안 그러면 같은 메시지가 두 번 보임).
-        const withoutOptimistic = prev.filter(
+        // 내가 방금 낙관적으로 먼저 화면에 띄워둔 임시 메시지가 있으면, 실제 서버 메시지가
+        // 도착했을 때 그 자리에서 바꿔치기한다 (같은 말풍선을 유지해서 깜빡이거나 다시 떠오르지 않게).
+        const optimistic = prev.find(
           (m) =>
-            !(
-              m.id.startsWith('temp-') &&
-              m.senderId === message.senderId &&
-              m.type === message.type &&
-              m.text === message.text &&
-              m.sharedSummary === message.sharedSummary
-            )
+            m.id.startsWith('temp-') &&
+            m.senderId === message.senderId &&
+            m.type === message.type &&
+            m.text === message.text &&
+            m.sharedSummary === message.sharedSummary
         );
-        return [...withoutOptimistic, message];
+        if (optimistic) {
+          return prev.map((m) => (m === optimistic ? { ...message, localKey: optimistic.localKey ?? optimistic.id } : m));
+        }
+        freshKeys.current.add(message.id);
+        return [...prev, message];
       });
     });
     return unsubscribe;
@@ -170,6 +178,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
     // 전송은 뒤에서 진행한다. 실패하면 이 임시 메시지만 지우고 입력창을 복원한다.
     const tempId = `temp-${Date.now()}`;
     stickToBottom.current = true;
+    freshKeys.current.add(tempId);
     setDraft('');
     setMessages((prev) => [
       ...prev,
@@ -278,7 +287,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
           ref={listRef}
           style={styles.flex}
           data={messages}
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m) => m.localKey ?? m.id}
           contentContainerStyle={styles.list}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
@@ -293,26 +302,16 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
             stickToBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
           }}
           renderItem={({ item }) => {
-            const mine = item.senderId === myId;
+            const rowKey = item.localKey ?? item.id;
             return (
-              <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
-                {!mine && <Text style={styles.sender}>{nicknameFor(item.senderId)}</Text>}
-                <View style={[styles.bubble, mine && styles.bubbleMine]}>
-                  {item.type === 'text' && (
-                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.text}</Text>
-                  )}
-                  {item.type === 'record_share' && (
-                    <View>
-                      <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>
-                        🏊 수영 기록 공유
-                      </Text>
-                      <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>
-                        {item.sharedSummary}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
+              <MessageBubble
+                item={item}
+                mine={item.senderId === myId}
+                nickname={nicknameFor(item.senderId)}
+                fresh={freshKeys.current.has(rowKey)}
+                rowKey={rowKey}
+                onAnimated={handleAnimated}
+              />
             );
           }}
           ListEmptyComponent={<Text style={styles.empty}>아직 대화가 없어요.</Text>}
@@ -442,7 +441,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginRight: spacing.hairline,
   },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.hairline },
+  // 아래쪽을 넉넉히 비워둬야 마지막 말풍선 밑에서 피어나는 공기방울이 잘리지 않는다.
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.hairline },
   bubbleRow: { marginBottom: spacing.hairline, alignItems: 'flex-start' },
   bubbleRowMine: { alignItems: 'flex-end' },
   sender: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 2 },
