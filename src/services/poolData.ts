@@ -5,7 +5,8 @@
 // 광장에서 걸러낸 서울시내 공공 수영장 목록)를 같이 검색해서 합친다 — 평일/주말 운영시간,
 // 이용료, 부대시설, 홈페이지, (서울 쪽은) 레일 수·자유수영 안내까지 실제로 들어있다.
 import proj4 from 'proj4';
-import { PUBLIC_POOL_FACILITIES } from '../data/publicPoolFacilities';
+import { PUBLIC_POOL_FACILITIES as GENERATED_PUBLIC_POOLS } from '../data/publicPoolFacilities';
+import { MANUAL_POOL_FACILITIES } from '../data/manualPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
 import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
 import { dedupeAgainst, isInKorea, PlaceInfo, rankNearby } from './geo';
@@ -88,6 +89,9 @@ function mapItem(item: any): OfficialPool {
     source: 'business',
   };
 }
+
+// 공공시설개방정보 + 손으로 추가한 공공 수영장.
+const PUBLIC_POOL_FACILITIES = [...GENERATED_PUBLIC_POOLS, ...MANUAL_POOL_FACILITIES];
 
 function mapPublicFacility(f: (typeof PUBLIC_POOL_FACILITIES)[number]): OfficialPool {
   return {
@@ -258,6 +262,8 @@ function withNearby(results: OfficialPool[]): OfficialPool[] {
 // 홈페이지도 전혀 없다 — 사용자가 눌러도 전화 말고는 할 게 없어서 불편하기만 하다.
 // 운영시간·요금·홈페이지·규모·자유수영·부대시설 중 하나도 없는 결과는 검색 결과에서 뺀다.
 function hasUsefulInfo(pool: OfficialPool): boolean {
+  // 손으로 넣은 수영장은 직접 확인해서 넣은 거라 세부 정보가 비어 있어도 보여준다.
+  if (pool.id.startsWith('manual-')) return true;
   return !!(
     pool.homepageUrl ||
     pool.feeText ||
