@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, radius, spacing } from '../theme';
 import type { ChatMessage } from '../storage/social';
 
@@ -22,20 +23,20 @@ interface Props {
   onAnimated: (rowKey: string) => void;
 }
 
+// 말풍선 "밖"(바로 아래)에서 피어나는 작은 공기방울. 말풍선 위로 올라가 겹치지 않고, 아래에서 살짝 떠오르다 사라진다.
 const DOTS = [
-  { size: 13, drift: 0, delay: 0, rise: 22 },
-  { size: 9, drift: 14, delay: 110, rise: 28 },
-  { size: 6, drift: 4, delay: 220, rise: 20 },
+  { size: 13, drift: 0, rise: 12 },
+  { size: 9, drift: 15, rise: 16 },
+  { size: 6, drift: 5, rise: 10 },
 ];
 
-/** 말풍선 바로 아래에서 작은 공기방울이 뽈뽈 피어나 떠오르다 사라진다. */
 function BubbleDots({ mine }: { mine: boolean }) {
   const values = useRef(DOTS.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
     Animated.stagger(
-      110,
-      values.map((v) => Animated.timing(v, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }))
+      120,
+      values.map((v) => Animated.timing(v, { toValue: 1, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true }))
     ).start();
   }, [values]);
 
@@ -54,15 +55,17 @@ function BubbleDots({ mine }: { mine: boolean }) {
                 height: d.size,
                 borderRadius: d.size / 2,
                 marginLeft: dir * d.drift,
-                opacity: t.interpolate({ inputRange: [0, 0.2, 0.8, 1], outputRange: [0, 1, 0.6, 0] }),
+                opacity: t.interpolate({ inputRange: [0, 0.18, 0.75, 1], outputRange: [0, 1, 0.85, 0] }),
                 transform: [
-                  { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -d.rise] }) },
-                  { translateX: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, dir * 4, dir * -3] }) },
-                  { scale: t.interpolate({ inputRange: [0, 0.25, 1], outputRange: [0.2, 1.15, 0.7] }) },
+                  { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [10, -d.rise + 10] }) },
+                  { translateX: t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, dir * 3, dir * -2] }) },
+                  { scale: t.interpolate({ inputRange: [0, 0.22, 1], outputRange: [0.2, 1.15, 0.8] }) },
                 ],
               },
             ]}
-          />
+          >
+            <View style={[styles.dotShine, { width: d.size * 0.32, height: d.size * 0.32, borderRadius: d.size * 0.16, top: d.size * 0.16, left: d.size * 0.2 }]} />
+          </Animated.View>
         );
       })}
     </View>
@@ -96,31 +99,47 @@ function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 아래에서 위로 살짝 떠오르며 커진다. 공기방울(BubbleDots)은 이 움직임과 따로, 말풍선이 멈춘 자리 바로 아래에서 피어난다.
   const bubbleStyle = animate
     ? {
-        opacity: rise.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 1, 1], extrapolate: 'clamp' }),
+        opacity: rise.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1], extrapolate: 'clamp' }),
         transformOrigin: mine ? 'right bottom' : 'left bottom',
         transform: [
-          { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [34, 0] }) },
-          { translateX: wobble.interpolate({ inputRange: [-1, 1], outputRange: [-4, 4] }) },
-          { scale: rise.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) },
+          { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+          { translateX: wobble.interpolate({ inputRange: [-1, 1], outputRange: [-3, 3] }) },
+          { scale: rise.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }) },
         ],
       }
     : undefined;
 
+  const text = [styles.bubbleText, mine && styles.bubbleTextMine];
+
   return (
     <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
       {!mine && <Text style={styles.sender}>{nickname}</Text>}
-      <Animated.View style={[styles.bubble, mine && styles.bubbleMine, bubbleStyle as object]}>
-        {item.type === 'text' && <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.text}</Text>}
-        {item.type === 'record_share' && (
-          <View>
-            <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>🏊 수영 기록 공유</Text>
-            <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{item.sharedSummary}</Text>
-          </View>
-        )}
+      <View style={styles.bubbleOuter}>
+        <Animated.View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther, bubbleStyle as object]}>
+          {/* 비눗방울처럼 투명한 유리 느낌: 반투명 색 + 무지개빛 번짐 + 윗쪽 반사광 */}
+          <LinearGradient
+            colors={mine ? GLASS_MINE : GLASS_OTHER}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient colors={SHEEN} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <View pointerEvents="none" style={styles.shine} />
+          <View pointerEvents="none" style={styles.glint} />
+          <View pointerEvents="none" style={styles.rimLight} />
+          {item.type === 'text' && <Text style={text}>{item.text}</Text>}
+          {item.type === 'record_share' && (
+            <View>
+              <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>🏊 수영 기록 공유</Text>
+              <Text style={text}>{item.sharedSummary}</Text>
+            </View>
+          )}
+        </Animated.View>
         {dots && <BubbleDots mine={mine} />}
-      </Animated.View>
+      </View>
     </View>
   );
 }
@@ -128,27 +147,40 @@ function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated }: 
 const MessageBubble = memo(MessageBubbleBase);
 export default MessageBubble;
 
+// 비눗방울 색: 거의 투명한 반투명 유리. 내 말풍선은 푸른 기운, 상대 말풍선은 흰 기운이 돈다.
+const GLASS_MINE = ['rgba(53,195,214,0.36)', 'rgba(10,120,166,0.26)'] as const;
+const GLASS_OTHER = ['rgba(255,255,255,0.78)', 'rgba(205,236,246,0.36)'] as const;
+const SHEEN = ['rgba(255,170,205,0.16)', 'rgba(255,255,255,0)', 'rgba(125,205,255,0.2)'] as const;
+
 const styles = StyleSheet.create({
   bubbleRow: { marginBottom: spacing.hairline, alignItems: 'flex-start' },
   bubbleRowMine: { alignItems: 'flex-end' },
   sender: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 2 },
+  bubbleOuter: { maxWidth: '78%' },
+  // 안쪽 여백은 예전(가로 8, 세로 6)보다 2씩 늘렸다.
   bubble: {
-    maxWidth: '78%',
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.hairline + 2,
+    borderRadius: 20,
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: spacing.hairline + 4,
+    borderWidth: 1.2,
+    overflow: 'hidden',
   },
-  bubbleMine: { backgroundColor: colors.primary },
+  bubbleMine: { borderColor: 'rgba(255,255,255,0.85)' },
+  bubbleOther: { borderColor: 'rgba(110,200,222,0.75)' },
   bubbleText: { fontFamily: fonts.regular, color: colors.text, fontSize: 14 },
-  bubbleTextMine: { color: colors.white },
-  shareLabel: { fontFamily: fonts.semibold, fontSize: 12, marginBottom: 2 },
-  dots: { position: 'absolute', top: '100%', flexDirection: 'row', alignItems: 'flex-end', gap: 5, paddingTop: 8 },
-  dotsMine: { right: 10, flexDirection: 'row-reverse' },
-  dotsOther: { left: 10 },
+  bubbleTextMine: { color: colors.deepSea },
+  shareLabel: { fontFamily: fonts.semibold, fontSize: 12, marginBottom: 2, color: colors.text },
+  // 윗쪽 반사광(길쭉한 하이라이트), 작은 점 반사, 아랫쪽 테두리 빛
+  shine: { position: 'absolute', top: 3, left: 10, width: 15, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.9)', transform: [{ rotate: '-12deg' }] },
+  glint: { position: 'absolute', top: 3, left: 28, width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.85)' },
+  rimLight: { position: 'absolute', bottom: 2, right: 12, width: 12, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.6)' },
+  dots: { position: 'absolute', top: '100%', flexDirection: 'row', alignItems: 'flex-end', gap: 5 },
+  dotsMine: { right: 12, flexDirection: 'row-reverse' },
+  dotsOther: { left: 12 },
   dot: {
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderWidth: 1.5,
-    borderColor: colors.aqua,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderWidth: 1.4,
+    borderColor: 'rgba(53,195,214,0.9)',
   },
+  dotShine: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.95)' },
 });

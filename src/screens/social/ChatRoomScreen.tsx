@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.hairline,
   },
   // 아래쪽을 넉넉히 비워둬야 마지막 말풍선 밑에서 피어나는 공기방울이 잘리지 않는다.
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.hairline },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.hairline },
   bubbleRow: { marginBottom: spacing.hairline, alignItems: 'flex-start' },
   bubbleRowMine: { alignItems: 'flex-end' },
   sender: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 2 },
