@@ -34,7 +34,7 @@ const PUBLIC_NAME = /시립|구립|군립|도립|시민|구민|군민|국민체�
 const PUBLIC_OPERATOR = /공단|공사|시설관리|체육회|문화재단|구청|시청|군청|교육청|재단법인|사회복지/;
 // 회원을 받는 수영장이 아닌 것(숙박/물놀이/아파트 입주민용 등)은 후보에서 뺀다.
 const NOT_A_CLUB = /호텔|리조트|펜션|모텔|콘도|풀빌라|캠핑|글램핑|아파트|힐스테이트|자이|푸르지오|래미안|아이파크|편한세상|입주민|워터파크|워터월드|물놀이|야외수영장|해수욕장|계곡|온천|스파|사우나|찜질|키즈풀/;
-const WEAK_PUBLIC_NAME = /체육센터|체육관|스포츠센터|레포츠|문화체육|종합운동장|국민체육|복지관|수련관|생활체육|문화센터|종합체육/;
+const WEAK_PUBLIC_NAME = /체육센터|체육관|스포츠센터|레포츠|문화체육|종합운동장|국민체육|종합체육/;
 
 export function classify(name: string, operator = ''): Exclude<Group, '확인필요'> {
   return PUBLIC_NAME.test(name) || PUBLIC_OPERATOR.test(operator) ? '공공' : '민간';
@@ -163,31 +163,31 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 async function overpass(query: string): Promise<any[]> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 6; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     const url = OVERPASS[attempt % OVERPASS.length];
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': 'doongsil-pool-collector/1.0' },
         body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(150000),
+        signal: AbortSignal.timeout(100000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json: any = await res.json();
       return json.elements ?? [];
     } catch (e) {
       lastErr = e;
-      await sleep(4000 * (attempt + 1));
+      await sleep(3000 * (attempt + 1));
     }
   }
   throw lastErr;
 }
 
-// 한국 전체를 위도 1도 x 경도 1.6도 타일로 나눠서 조회한다(한 번에 하면 서버가 시간 초과로 끊는다).
+// 한국 전체를 위도 0.5도 x 경도 0.8도 타일로 나눠서 조회한다(크게 한 번에 하면 서버가 시간 초과로 끊는다).
 function tiles(): [number, number, number, number][] {
   const out: [number, number, number, number][] = [];
-  for (let s = 33; s < 38.8; s += 1) {
-    for (let w = 124.5; w < 131.2; w += 1.6) out.push([s, w, s + 1, w + 1.6]);
+  for (let s = 33; s < 38.8; s += 0.5) {
+    for (let w = 124.5; w < 131.2; w += 0.8) out.push([s, w, s + 0.5, w + 0.8]);
   }
   return out;
 }
@@ -200,44 +200,54 @@ interface OsmItem {
   tags: Record<string, string>;
 }
 
-const OSM_CACHE = path.join(OUT_DIR, 'osm-cache.json');
+const OSM_TILES_CACHE = path.join(OUT_DIR, 'osm-tiles.json');
 
-async function collectOsm(): Promise<OsmItem[]> {
-  // 한 번 받아두면 다시 돌릴 때 재사용한다(20분 걸리는 일이라). 새로 받으려면 --refresh-osm.
-  if (!args.has('--refresh-osm') && fs.existsSync(OSM_CACHE)) {
-    const cached: OsmItem[] = JSON.parse(fs.readFileSync(OSM_CACHE, 'utf8'));
-    console.log(`  저장해둔 오픈스트리트맵 결과 ${cached.length}건 사용 (새로 받으려면 --refresh-osm)`);
-    return cached;
+// 구역(타일)별로 결과를 저장해둔다. 중간에 실패/중단돼도 다시 돌리면 받은 구역은 건너뛰고 이어서 받는다.
+// 처음부터 다시 받으려면 --refresh-osm.
+async function collectOsm(): Promise<{ items: OsmItem[]; failedTiles: number }> {
+  let done: Record<string, OsmItem[]> = {};
+  if (!args.has('--refresh-osm') && fs.existsSync(OSM_TILES_CACHE)) {
+    try {
+      done = JSON.parse(fs.readFileSync(OSM_TILES_CACHE, 'utf8'));
+    } catch {
+      done = {};
+    }
   }
-  const seen = new Map<string, OsmItem>();
   const list = tiles();
+  let failedTiles = 0;
   for (let i = 0; i < list.length; i++) {
     const [s, w, n, e] = list[i];
+    const tileKey = `${s},${w.toFixed(1)}`;
+    if (done[tileKey]) continue;
     const bb = `${s},${w},${n},${e}`;
-    const q = `[out:json][timeout:120];(
+    const q = `[out:json][timeout:90];(
       nwr["leisure"="swimming_pool"]["name"](${bb});
       nwr["sport"="swimming"]["name"](${bb});
       nwr["leisure"="sports_centre"]["name"~"수영"](${bb});
     );out center tags;`;
     process.stdout.write(`  OSM ${i + 1}/${list.length} `);
-    const els = await overpass(q);
-    let added = 0;
-    for (const el of els) {
-      const tags = el.tags ?? {};
-      const lat = el.lat ?? el.center?.lat;
-      const lng = el.lon ?? el.center?.lon;
-      if (!tags.name || lat == null || lng == null || !isInKorea(lat, lng)) continue;
-      const id = `${el.type}/${el.id}`;
-      if (seen.has(id)) continue;
-      seen.set(id, { id, name: String(tags.name).trim(), lat, lng, tags });
-      added++;
+    try {
+      const els = await overpass(q);
+      const items: OsmItem[] = [];
+      for (const el of els) {
+        const tags = el.tags ?? {};
+        const lat = el.lat ?? el.center?.lat;
+        const lng = el.lon ?? el.center?.lon;
+        if (!tags.name || lat == null || lng == null || !isInKorea(lat, lng)) continue;
+        items.push({ id: `${el.type}/${el.id}`, name: String(tags.name).trim(), lat, lng, tags });
+      }
+      done[tileKey] = items;
+      fs.writeFileSync(OSM_TILES_CACHE, JSON.stringify(done));
+      console.log(`→ ${items.length}건`);
+    } catch (err) {
+      failedTiles++;
+      console.log(`→ 실패(${(err as Error).message}), 나중에 다시 돌리면 이 구역만 받아요`);
     }
-    console.log(`→ ${added}건`);
-    await sleep(1500);
+    await sleep(1000);
   }
-  const result = Array.from(seen.values());
-  fs.writeFileSync(OSM_CACHE, JSON.stringify(result));
-  return result;
+  const seen = new Map<string, OsmItem>();
+  Object.values(done).flat().forEach((it) => seen.set(it.id, it));
+  return { items: Array.from(seen.values()), failedTiles };
 }
 
 function osmExcluded(it: OsmItem): boolean {
@@ -433,7 +443,7 @@ async function main() {
   if (!args.has('--skip-osm')) {
     console.log('오픈스트리트맵에서 전국 수영장을 모으는 중 (10~20분 걸릴 수 있어요)…');
     try {
-      const osm = await collectOsm();
+      const { items: osm, failedTiles } = await collectOsm();
       let excluded = 0;
       let dup = 0;
       const fresh: Row[] = [];
@@ -459,7 +469,9 @@ async function main() {
         fresh.push(row);
       }
       rows.push(...fresh);
-      const msg = `오픈스트리트맵: 이름 있는 수영장 ${osm.length}건 → 숙박/아파트 등 제외 ${excluded}, 이미 있음 ${dup}, 새로 추가 ${fresh.length}`;
+      const msg =
+        `오픈스트리트맵: 이름 있는 수영장 ${osm.length}건 → 숙박/아파트 등 제외 ${excluded}, 이미 있음 ${dup}, 새로 추가 ${fresh.length}` +
+        (failedTiles ? `\n  !! 받지 못한 구역 ${failedTiles}곳 있음 — 같은 명령을 다시 실행하면 그 구역만 이어서 받아요(결과가 모자랄 수 있음)` : '');
       console.log(msg);
       report.push(msg);
     } catch (e) {
@@ -476,15 +488,18 @@ async function main() {
       const recs = await collectPublicApi(key);
       let strong = 0;
       let weak = 0;
+      const typeCount = new Map<string, number>();
       let dup = 0;
       for (const rec of recs) {
         const facility = pick(rec, /^(open)?fclty.*nm$/i, /fclty.*name$/i);
         const placeNm = pick(rec, /(place|plc).*nm$/i);
         if (!facility || NOT_A_CLUB.test(facility)) continue;
         // 시설명이나 개방 장소명에 "수영"이 있으면 수영장 근거가 확실한 것으로 본다.
-        const isStrong = /수영/.test(facility) || /수영/.test(placeNm);
+        const fcltyType = pick(rec, /fcltyType$/i);
+        const isStrong = /수영/.test(facility) || /수영/.test(placeNm) || /수영/.test(fcltyType);
         const name = isStrong && !/수영/.test(facility) ? `${facility} ${placeNm}` : facility;
         const isWeak = !isStrong && WEAK_PUBLIC_NAME.test(facility);
+        if (isWeak) typeCount.set(fcltyType || '(없음)', (typeCount.get(fcltyType || '(없음)') ?? 0) + 1);
         if (!isStrong && !isWeak) continue;
         const lat = Number(pick(rec, /latitude|lat$/i));
         const lng = Number(pick(rec, /longitude|lng$|lon$/i));
@@ -512,6 +527,8 @@ async function main() {
       const msg = `공공시설개방정보 ${recs.length}건: 수영장 근거 있음 +${strong}, 수영장 여부 확인필요 +${weak}, 이미 있음 ${dup}`;
       console.log(msg);
       report.push(msg);
+      const top = [...typeCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t, n]) => `${t} ${n}`).join(', ');
+      if (top) report.push(`  확인필요 시설 종류: ${top}`);
     } catch (e) {
       const msg = `공공시설개방정보 수집 실패(건너뜀): ${(e as Error).message}`;
       console.log(msg);
