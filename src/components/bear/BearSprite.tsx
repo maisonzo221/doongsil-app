@@ -3,12 +3,12 @@ import { Animated, Easing, Image, Pressable, View } from 'react-native';
 import type { Equipped } from '../../storage/bear';
 
 // 둥실곰: 캐릭터 보드(assets/bear)의 그림을 그대로 쓴다. 덧그린 것은 없다.
-// - 입은 것에 따라 보드 그림이 통째로 바뀐다: 기본 / 수모 / 메달 / 수모+메달(수모 그림에 메달 부분만 오려 붙임).
+// - 입은 것에 따라 보드 그림이 통째로 바뀐다: 기본 / 수모 / 메달. 새 아이템 보드가 오면 여기에 한 줄씩 추가한다.
 // - 서 있는 모습(정면)과, 헤엄치는 모습(자유형·접영·평영·배영을 번갈아)을 쓴다.
 
 export type BearMode = 'idle' | 'swim';
 
-type Variant = 'base' | 'cap' | 'medal' | 'capmedal';
+type Variant = 'base' | 'cap' | 'medal';
 type SwimPose = 'free' | 'fly' | 'breast' | 'back';
 const SWIM_POSES: SwimPose[] = ['free', 'fly', 'breast', 'back'];
 
@@ -28,10 +28,8 @@ const FRONT_IMG: Record<Variant, number> = {
   base: require('../../../assets/bear/base-front.png'),
   cap: require('../../../assets/bear/cap-front.png'),
   medal: require('../../../assets/bear/medal-front.png'),
-  capmedal: require('../../../assets/bear/capmedal-front.png'),
 };
-// 수모와 메달을 같이 한 헤엄 그림은 아직 없어서, 둘 다 입었으면 수모 그림을 쓴다.
-const SWIM_IMG: Record<'base' | 'cap' | 'medal', Record<SwimPose, number>> = {
+const SWIM_IMG: Record<Variant, Record<SwimPose, number>> = {
   base: {
     free: require('../../../assets/bear/base-free.png'),
     fly: require('../../../assets/bear/base-fly.png'),
@@ -52,8 +50,8 @@ const SWIM_IMG: Record<'base' | 'cap' | 'medal', Record<SwimPose, number>> = {
   },
 };
 
+// 보드 그림이 있는 아이템만 보인다. 보드 한 장에 한 가지 아이템만 입고 있어서 한 번에 한 가지만 입는다.
 function variantOf(e: Equipped): Variant {
-  if (e.cap && e.medal) return 'capmedal';
   return e.cap ? 'cap' : e.medal ? 'medal' : 'base';
 }
 
@@ -82,7 +80,7 @@ interface Props {
 function SwimBear({ height, equipped, paused }: { height: number; equipped: Equipped; paused?: boolean }) {
   const box = bearBox('swim', height);
   const v = variantOf(equipped);
-  const set = SWIM_IMG[v === 'capmedal' ? 'cap' : v];
+  const set = SWIM_IMG[v];
   const fades = useRef(SWIM_POSES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
   const current = useRef(0);
 

@@ -203,9 +203,11 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                         // 받은 아이템 중 바로 입을 수 있는 것을 입혀준다(수영복은 팬티가 기본).
                         const patch: Record<string, unknown> = {};
                         for (const id of reward.gained) {
-                          // 수영복·수경은 아직 그림이 없어서 입히지 않는다.
-                          if (id === 'cap') patch.cap = true;
-                          else if (id === 'medal') patch.medal = true;
+                          // 수영복·수경은 아직 그림이 없어서 입히지 않는다. 한 가지만 입을 수 있다.
+                          if (id === 'cap' || id === 'medal') {
+                            patch[id] = true;
+                            break;
+                          }
                         }
                         await setEquipped(patch);
                         setReward(null);
