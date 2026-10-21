@@ -27,7 +27,7 @@ import { toE164 } from '../../utils/phone';
 
 type Props = NativeStackScreenProps<FriendsStackParamList, 'Settings'>;
 
-export default function SettingsScreen({ navigation }: Props) {
+export default function SettingsScreen({}: Props) {
   const [me, setMe] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [editingTenure, setEditingTenure] = useState(false);
@@ -224,10 +224,6 @@ export default function SettingsScreen({ navigation }: Props) {
             )}
           </View>
         )}
-
-        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('BearCustomize')}>
-          <Text style={styles.rowText}>내 둥실곰 꾸미기</Text>
-        </TouchableOpacity>
 
         <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowText}>개인정보 처리방침</Text>

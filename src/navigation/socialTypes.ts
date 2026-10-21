@@ -4,5 +4,4 @@ export type FriendsStackParamList = {
   FriendsHome: { code?: string } | undefined;
   ChatRoom: { groupId: string; groupName: string; ownerId: string; roomKind: RoomKind };
   Settings: undefined;
-  BearCustomize: undefined;
 };

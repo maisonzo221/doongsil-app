@@ -2,18 +2,15 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { ClipPath, Defs, Image as SvgImage, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import BearSprite, { bearBox } from './bear/BearSprite';
-import { useBearState } from '../storage/bear';
 import { colors } from '../theme';
 
-// 하단 메뉴바: 맑은 물이 흐르는 바 위를 북극곰이 자유형으로 헤엄친다.
-// 곰은 지금 선택된 메뉴 위로 헤엄쳐 가고, 가운데(캘린더) 메뉴가 솟아 있는 곳에서는 그 곡선을 따라 올라간다.
+// 하단 메뉴바: 맑은 물이 흐르는 바. 가운데(캘린더) 메뉴가 물 위로 솟아 있고,
+// 지금 선택한 메뉴는 물방울 모양 빛이 따라다니며 표시한다.
 
 const WATER_TOP = 18; // 아이콘 줄 위쪽으로 확보한 물 영역 (아이콘 아래 여백과 같게)
 const ROW = 60; // 아이콘 줄 높이
 const HILL_H = 24; // 가운데 메뉴가 솟아오른 높이
 const HILL_B = 66; // 솟아오른 부분의 가로 반폭
-const BEAR_H = 50;
 // 그림(water.jpg)에서 곰이 없는 물 부분을 잘라 쓴다 (그림 픽셀 좌표).
 const PAINT_W = 1003;
 const PAINT_H = 1534;
@@ -116,44 +113,12 @@ export default function WaterTabBar({
   const calendarIndex = Math.max(0, state.routes.findIndex((r) => r.name === 'Calendar'));
   const cx = (calendarIndex + 0.5) * slot;
   const height = WATER_TOP + ROW + insets.bottom;
-  const bear = useBearState();
-
-  // 곰: 선택된 메뉴 위로 헤엄쳐 간다.
+  // 선택된 메뉴 뒤를 따라다니는 물방울 빛
   const targetX = (state.index + 0.5) * slot;
-  const bearX = useRef(new Animated.Value(targetX)).current;
+  const glowX = useRef(new Animated.Value(targetX)).current;
   useEffect(() => {
-    Animated.spring(bearX, { toValue: targetX, friction: 9, tension: 38, useNativeDriver: true }).start();
-  }, [bearX, targetX]);
-
-  // x에 따른 높이/기울기 표 (가운데 언덕의 곡률을 따라 올라가고 내려온다)
-  const { xs, ys, rot } = useMemo(() => {
-    const xs: number[] = [];
-    const ys: number[] = [];
-    const rot: string[] = [];
-    const step = 3;
-    for (let x = 0; x <= W; x += step) {
-      xs.push(x);
-      ys.push(surfaceY(x - cx));
-      const slope = (surfaceY(x + 1 - cx) - surfaceY(x - 1 - cx)) / 2;
-      rot.push(`${(Math.atan(slope) * 180) / Math.PI}deg`);
-    }
-    return { xs, ys, rot };
-  }, [W, cx]);
-
-  const bearY = bearX.interpolate({ inputRange: xs, outputRange: ys, extrapolate: 'clamp' });
-  const bearRot = bearX.interpolate({ inputRange: xs, outputRange: rot, extrapolate: 'clamp' });
-
-  const bob = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bob, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(bob, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [bob]);
+    Animated.spring(glowX, { toValue: targetX, friction: 8, tension: 60, useNativeDriver: true }).start();
+  }, [glowX, targetX]);
 
   // 모집 알림 아이콘이 붉게 깜빡인다.
   const pulse = useRef(new Animated.Value(1)).current;
@@ -185,11 +150,9 @@ export default function WaterTabBar({
     return d;
   }, [W, cx]);
 
-  const swimW = bearBox('swim', BEAR_H).width;
-
   return (
     <View style={[styles.bar, { height }]}>
-      {/* 물 (곰 뒤) */}
+      {/* 물 (뒤) */}
       <Svg width={W} height={HILL_H + height} style={{ position: 'absolute', left: 0, top: -HILL_H }} pointerEvents="none">
         <Defs>
           <SvgGradient id="waterBack" x1="0" y1="0" x2="0" y2="1">
@@ -221,24 +184,7 @@ export default function WaterTabBar({
         <WaveStrip width={W} height={height} top={40} period={120} amplitude={5} duration={8200} reverse fill="rgba(150,140,255,0.16)" />
       </View>
 
-      {/* 곰: 선택된 메뉴 위에서 계속 자유형 */}
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: -swimW / 2,
-          top: -BEAR_H / 2,
-          width: swimW,
-          height: BEAR_H,
-          transform: [{ translateX: bearX }, { translateY: bearY }, { rotate: bearRot }],
-        }}
-      >
-        <Animated.View style={{ transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [-1.5, 1.5] }) }] }}>
-          <BearSprite mode="swim" height={BEAR_H} equipped={bear.equipped} />
-        </Animated.View>
-      </Animated.View>
-
-      {/* 물 (곰 앞): 곰의 아랫부분이 물에 잠겨 보이게 투명한 물을 한 겹 덮는다 */}
+      {/* 물 (앞): 투명한 물을 한 겹 더 덮어 깊이를 준다 */}
       <Svg width={W} height={HILL_H + height} style={{ position: 'absolute', left: 0, top: -HILL_H }} pointerEvents="none">
         <Defs>
           <SvgGradient id="waterFront" x1="0" y1="0" x2="0" y2="1">
@@ -253,6 +199,15 @@ export default function WaterTabBar({
       <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
         <WaveStrip width={W} height={height} top={0} period={110} amplitude={4} duration={7000} reverse fill="rgba(255,255,255,0.22)" delay={300} />
       </View>
+
+      {/* 선택한 메뉴 표시 */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.glow,
+          { top: WATER_TOP + (ROW - 46) / 2 - 2, transform: [{ translateX: Animated.add(glowX, -23) }] },
+        ]}
+      />
 
       {/* 메뉴 아이콘 */}
       <View style={[styles.row, { top: WATER_TOP, height: ROW }]}>
@@ -290,6 +245,7 @@ export default function WaterTabBar({
 const styles = StyleSheet.create({
   bar: { width: '100%', overflow: 'visible' },
   row: { position: 'absolute', left: 0, right: 0, flexDirection: 'row' },
+  glow: { position: 'absolute', left: 0, width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.24)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.55)' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   iconWrap: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   iconWrapCenter: { marginTop: -8 },

@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BearStamp from './BearStamp';
-import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
-import { ITEM_IMAGES } from '../data/itemImages';
-import { completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
+import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, ITEM_EMOJI, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
+import { completeMission, currentTier, levelOf, syncAutoMissions, useBearState } from '../storage/bear';
 import type { CompleteResult } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
 
@@ -11,7 +10,6 @@ interface Props {
   /** 지금까지 남긴 수영 기록 개수 — "첫 수영하기"를 자동으로 확인하는 데 쓴다. */
   recordCount: number;
   onAddRecord: () => void;
-  onOpenCustomize: () => void;
 }
 
 /** 도장 칸: 찍히면 곰 얼굴 도장이 쾅 찍힌다. */
@@ -64,7 +62,7 @@ function StampSlot({ done, isNext }: { done: boolean; isNext: boolean }) {
   );
 }
 
-export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize }: Props) {
+export default function MissionCard({ recordCount, onAddRecord }: Props) {
   const bear = useBearState();
   const progress = currentTier(bear);
   const level = levelOf(bear);
@@ -142,9 +140,6 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
         <Text style={styles.hint} numberOfLines={2}>
           {hint}
         </Text>
-        <TouchableOpacity onPress={onOpenCustomize} style={styles.dressBtn}>
-          <Text style={styles.dressBtnText}>곰 꾸미기</Text>
-        </TouchableOpacity>
       </View>
 
       {/* 미션 설명 */}
@@ -182,37 +177,16 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                   {reward.gained.map((id) => (
                     <View key={id} style={styles.rewardItem}>
                       <View style={styles.rewardThumb}>
-                        <Image source={ITEM_IMAGES[id]} style={styles.rewardImg} resizeMode="contain" />
+                        <Text style={styles.rewardEmoji}>{ITEM_EMOJI[id]}</Text>
                       </View>
                       <Text style={styles.rewardName}>{ITEMS[id].name}</Text>
                     </View>
                   ))}
                 </View>
                 <View style={styles.rewardButtonsCol}>
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => setReward(null)}>
-                    <Text style={styles.secondaryBtnText}>확인</Text>
+                  <TouchableOpacity style={styles.primaryBtn} onPress={() => setReward(null)}>
+                    <Text style={styles.primaryBtnText}>확인</Text>
                   </TouchableOpacity>
-                  {reward.gained.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.primaryBtn}
-                      onPress={async () => {
-                        // 받은 아이템 중 바로 입을 수 있는 것을 입혀준다(수영복은 팬티가 기본).
-                        const patch: Record<string, unknown> = {};
-                        for (const id of reward.gained) {
-                          if (id === 'trunks' && !patch.suit) patch.suit = 'trunks';
-                          else if (id === 'onepiece' && !patch.suit) patch.suit = 'onepiece';
-                          else if (id === 'goggles') patch.goggles = true;
-                          else if (id === 'cap') patch.cap = true;
-                          else if (id === 'medal') patch.medal = true;
-                        }
-                        await setEquipped(patch);
-                        setReward(null);
-                        onOpenCustomize();
-                      }}
-                    >
-                      <Text style={styles.primaryBtnText}>곰에게 입히러 가기</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </>
             )}
@@ -333,8 +307,6 @@ const styles = StyleSheet.create({
   slotGlow: { position: 'absolute', width: 54, height: 54, borderRadius: 27, backgroundColor: colors.aqua },
   hintRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs, marginTop: spacing.xs },
   hint: { flex: 1, fontFamily: fonts.regular, color: colors.textMuted, fontSize: 11 },
-  dressBtn: { backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  dressBtnText: { fontFamily: fonts.bold, color: colors.primary, fontSize: 11 },
   backdrop: { flex: 1, backgroundColor: 'rgba(11,42,74,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
   sheet: { width: '100%', maxHeight: '80%', backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.md },
   detailTitle: { fontFamily: fonts.bold, fontSize: 19, color: colors.text, marginBottom: spacing.hairline },
@@ -356,6 +328,6 @@ const styles = StyleSheet.create({
   rewardItems: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginVertical: spacing.sm },
   rewardItem: { alignItems: 'center', width: 96 },
   rewardThumb: { width: 84, height: 84, borderRadius: 42, backgroundColor: colors.cardSoft, alignItems: 'center', justifyContent: 'center' },
-  rewardImg: { width: 64, height: 64 },
+  rewardEmoji: { fontSize: 40 },
   rewardName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 12, marginTop: 6, textAlign: 'center' },
 });
