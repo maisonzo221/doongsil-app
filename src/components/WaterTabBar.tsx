@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { ClipPath, Defs, Image as SvgImage, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import BearSprite from './bear/BearSprite';
-import { BEAR_SIZE } from './bear/frames';
+import BearSprite, { bearBox } from './bear/BearSprite';
 import { useBearState } from '../storage/bear';
 import { colors } from '../theme';
 
@@ -14,7 +13,7 @@ const WATER_TOP = 18; // 아이콘 줄 위쪽으로 확보한 물 영역 (아이
 const ROW = 60; // 아이콘 줄 높이
 const HILL_H = 24; // 가운데 메뉴가 솟아오른 높이
 const HILL_B = 66; // 솟아오른 부분의 가로 반폭
-const BEAR_H = 46;
+const BEAR_H = 50;
 // 그림(water.jpg)에서 곰이 없는 물 부분을 잘라 쓴다 (그림 픽셀 좌표).
 const PAINT_W = 1003;
 const PAINT_H = 1534;
@@ -186,7 +185,7 @@ export default function WaterTabBar({
     return d;
   }, [W, cx]);
 
-  const swimW = (BEAR_H * BEAR_SIZE.swim.w) / BEAR_SIZE.swim.h;
+  const swimW = bearBox('swim', BEAR_H).width;
 
   return (
     <View style={[styles.bar, { height }]}>
@@ -235,7 +234,7 @@ export default function WaterTabBar({
         }}
       >
         <Animated.View style={{ transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [-1.5, 1.5] }) }] }}>
-          <BearSprite mode="swim" height={BEAR_H} equipped={bear.equipped} fps={14} />
+          <BearSprite mode="swim" height={BEAR_H} equipped={bear.equipped} />
         </Animated.View>
       </Animated.View>
 
