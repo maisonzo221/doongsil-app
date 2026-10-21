@@ -34,8 +34,8 @@ const RECENT_COUNT = 5;
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'CalendarHome'>;
 
-// 요일은 한자로 쓴다 (日月火水木金土 + 曜日).
-const WEEKDAY_HANJA = ['日', '月', '火', '水', '木', '金', '土'];
+// 요일은 영어 줄임말로 쓴다.
+const WEEKDAY_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 function todayHeaderParts() {
   const now = new Date();
@@ -43,7 +43,7 @@ function todayHeaderParts() {
     year: now.getFullYear(),
     month: now.getMonth() + 1,
     day: now.getDate(),
-    weekday: `${WEEKDAY_HANJA[now.getDay()]}曜日`,
+    weekday: WEEKDAY_SHORT[now.getDay()],
   };
 }
 

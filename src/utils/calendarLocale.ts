@@ -10,7 +10,7 @@ LocaleConfig.locales['ko'] = {
     '7월', '8월', '9월', '10월', '11월', '12월',
   ],
   dayNames: ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'],
-  dayNamesShort: ['日', '月', '火', '水', '木', '金', '土'],
+  dayNamesShort: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'],
   today: '오늘',
 };
 LocaleConfig.defaultLocale = 'ko';
