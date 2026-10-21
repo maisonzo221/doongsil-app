@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
+import Svg, { ClipPath, Defs, Image as SvgImage, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import BearSprite from './bear/BearSprite';
 import { BEAR_SIZE } from './bear/frames';
@@ -15,6 +15,11 @@ const ROW = 60; // 아이콘 줄 높이
 const HILL_H = 24; // 가운데 메뉴가 솟아오른 높이
 const HILL_B = 66; // 솟아오른 부분의 가로 반폭
 const BEAR_H = 46;
+// 그림(water.jpg)에서 곰이 없는 물 부분을 잘라 쓴다 (그림 픽셀 좌표).
+const PAINT_W = 1003;
+const PAINT_H = 1534;
+const PAINT_Y = 1040;
+const PAINT_SCALE = 0.62;
 const WATER = {
   light: '#4FD0EE',
   mid: '#1F9BDA',
@@ -189,11 +194,24 @@ export default function WaterTabBar({
       <Svg width={W} height={HILL_H + height} style={{ position: 'absolute', left: 0, top: -HILL_H }} pointerEvents="none">
         <Defs>
           <SvgGradient id="waterBack" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={WATER.light} />
-            <Stop offset="0.35" stopColor={WATER.mid} />
-            <Stop offset="1" stopColor={WATER.deep} />
+            <Stop offset="0" stopColor={WATER.light} stopOpacity="0.35" />
+            <Stop offset="0.35" stopColor={WATER.mid} stopOpacity="0.72" />
+            <Stop offset="1" stopColor={WATER.deep} stopOpacity="0.92" />
           </SvgGradient>
+          <ClipPath id="waterShape">
+            <Path d={surfacePath} />
+          </ClipPath>
         </Defs>
+        {/* 로딩 화면 그림의 물결 붓터치를 바닥 질감으로 깔고, 그 위에 맑은 물색을 덮는다 */}
+        <SvgImage
+          href={require('../../assets/landing/water.jpg')}
+          x={-70}
+          y={-PAINT_Y * PAINT_SCALE}
+          width={PAINT_W * PAINT_SCALE}
+          height={PAINT_H * PAINT_SCALE}
+          preserveAspectRatio="none"
+          clipPath="url(#waterShape)"
+        />
         <Path d={surfacePath} fill="url(#waterBack)" />
       </Svg>
 
@@ -259,7 +277,7 @@ export default function WaterTabBar({
             >
               <View style={[styles.iconWrap, isCenter && styles.iconWrapCenter]}>
                 {isAlert && <Animated.View style={[styles.alertGlow, { opacity: pulse }]} />}
-                {Icon && <Icon color={focused || isAlert ? colors.white : 'rgba(255,255,255,0.74)'} size={isCenter ? 34 : 28} />}
+                {Icon && <Icon color={focused || isAlert ? colors.white : 'rgba(255,255,255,0.92)'} size={isCenter ? 34 : 28} />}
                 {isAlert && <View style={styles.alertDot} />}
               </View>
             </Pressable>

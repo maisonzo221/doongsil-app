@@ -2,7 +2,7 @@
 export type BearLayer = 'base' | 'trunks' | 'onepiece' | 'medal' | 'goggles' | 'cap';
 export type BearSet = 'stand-idle' | 'stand-practice' | 'swim-swim';
 export const BEAR_FRAME_COUNT = 16;
-export const BEAR_SIZE = {"stand": {"w": 288, "h": 411}, "swim": {"w": 242, "h": 134}} as const;
+export const BEAR_SIZE = {"stand": {"w": 287, "h": 410}, "swim": {"w": 242, "h": 134}} as const;
 export const BEAR_FRAMES: Record<BearSet, Record<BearLayer, number[]>> = {
   'stand-idle': {
     base: [require('../../../assets/bear/stand-idle-base-00.png'), require('../../../assets/bear/stand-idle-base-01.png'), require('../../../assets/bear/stand-idle-base-02.png'), require('../../../assets/bear/stand-idle-base-03.png'), require('../../../assets/bear/stand-idle-base-04.png'), require('../../../assets/bear/stand-idle-base-05.png'), require('../../../assets/bear/stand-idle-base-06.png'), require('../../../assets/bear/stand-idle-base-07.png'), require('../../../assets/bear/stand-idle-base-08.png'), require('../../../assets/bear/stand-idle-base-09.png'), require('../../../assets/bear/stand-idle-base-10.png'), require('../../../assets/bear/stand-idle-base-11.png'), require('../../../assets/bear/stand-idle-base-12.png'), require('../../../assets/bear/stand-idle-base-13.png'), require('../../../assets/bear/stand-idle-base-14.png'), require('../../../assets/bear/stand-idle-base-15.png')],
