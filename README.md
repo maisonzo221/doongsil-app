@@ -16,7 +16,7 @@
 - React Navigation (bottom tabs + native stack)
 - expo-sqlite/kv-store 기반 로컬 저장 (서버 없음)
 - react-native-calendars 커스텀 캘린더
-- Spoqa Han Sans Neo(한글) + Montserrat(영문, Gotham 대체 — 라이선스 문제로 무료 폰트 사용 중)
+- Pretendard (한글·영문 공통, SIL OFL)
 
 ## Expo Go 제약 — mock 처리한 기능
 

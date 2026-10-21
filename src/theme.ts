@@ -91,21 +91,19 @@ export const radius = {
   pill: 999,
 };
 
-// Spoqa Han Sans Neo has no true Semibold, so semibold falls back to Bold.
-// Gotham is a paid commercial font we can't bundle; Montserrat stands in as
-// the closest free geometric-sans until real Gotham files are provided.
+// Pretendard (SIL OFL) for all UI text, Korean and English alike.
 export const fonts = {
-  light: 'SpoqaHanSansNeo-Light',
-  regular: 'SpoqaHanSansNeo-Regular',
-  medium: 'SpoqaHanSansNeo-Medium',
-  semibold: 'SpoqaHanSansNeo-Bold',
-  bold: 'SpoqaHanSansNeo-Bold',
+  light: 'Pretendard-Light',
+  regular: 'Pretendard-Regular',
+  medium: 'Pretendard-Medium',
+  semibold: 'Pretendard-SemiBold',
+  bold: 'Pretendard-Bold',
 
-  enLight: 'Montserrat_300Light',
-  enRegular: 'Montserrat_400Regular',
-  enMedium: 'Montserrat_500Medium',
-  enSemibold: 'Montserrat_600SemiBold',
-  enBold: 'Montserrat_700Bold',
+  enLight: 'Pretendard-Light',
+  enRegular: 'Pretendard-Regular',
+  enMedium: 'Pretendard-Medium',
+  enSemibold: 'Pretendard-SemiBold',
+  enBold: 'Pretendard-Bold',
 
   // Brand wordmark only ("둥실" on the splash/logo) — not general UI text.
   heading: 'Jua_400Regular',
