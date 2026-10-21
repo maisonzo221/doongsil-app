@@ -17,8 +17,9 @@ import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
 import SettingsScreen from '../screens/social/SettingsScreen';
+import BearCustomizeScreen from '../screens/BearCustomizeScreen';
 import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
-import CenterTabIcon from '../components/CenterTabIcon';
+import WaterTabBar from '../components/WaterTabBar';
 import { colors } from '../theme';
 import { CalendarStackParamList, RootTabParamList } from './types';
 import { FriendsStackParamList } from './socialTypes';
@@ -42,9 +43,6 @@ const TAB_ICON: Record<keyof RootTabParamList, React.ComponentType<{ color: stri
   Teaching: TeachingIcon,
   Shop: ShopIcon,
 };
-
-// 가운데(가이드) 탭은 아이콘만 더 크고 떠 있는 느낌으로 특별 취급한다.
-const CENTER_TAB: keyof RootTabParamList = 'TipRoom';
 
 const linking: LinkingOptions<any> = {
   prefixes: ['doongsil://'],
@@ -74,6 +72,11 @@ function CalendarStackNavigator() {
         options={{ headerShown: true, title: '기록 상세', headerBackButtonDisplayMode: 'minimal' }}
       />
       <CalendarStack.Screen
+        name="BearCustomize"
+        component={BearCustomizeScreen}
+        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <CalendarStack.Screen
         name="StatDetail"
         component={StatDetailScreen}
         options={{ headerShown: false }}
@@ -90,6 +93,11 @@ function FriendsStackNavigator() {
         name="ChatRoom"
         component={ChatRoomScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <FriendsStack.Screen
+        name="BearCustomize"
+        component={BearCustomizeScreen}
+        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
       />
       <FriendsStack.Screen
         name="Settings"
@@ -122,27 +130,16 @@ function AppTabs() {
   const enrollmentAlerts = useEnrollmentAlerts();
   const hasEnrollmentAlert = enrollmentAlerts.length > 0;
   useEnrollmentNotificationSync();
+  // 순서: 수친 · 가이드(지도) · 캘린더(가운데, 앱을 켜면 처음 보이는 화면) · 티칭 · 샵
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.disabledText,
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border, height: 64 },
-        tabBarIcon: ({ color }) => {
-          const Icon = TAB_ICON[route.name as keyof RootTabParamList];
-          const isCenter = route.name === CENTER_TAB;
-          if (isCenter) {
-            return <CenterTabIcon Icon={Icon} alerting={hasEnrollmentAlert} />;
-          }
-          return <Icon color={color} size={28} />;
-        },
-      })}
+      initialRouteName="Calendar"
+      tabBar={(props) => <WaterTabBar {...props} icons={TAB_ICON} alertRoute="TipRoom" alerting={hasEnrollmentAlert} />}
+      screenOptions={{ headerShown: false }}
     >
       {FEATURE_FLAGS.friendsAndChat && <Tab.Screen name="Friends" component={FriendsStackNavigator} />}
-      <Tab.Screen name="Calendar" component={CalendarStackNavigator} />
       <Tab.Screen name="TipRoom" component={TipRoomStackNavigator} />
+      <Tab.Screen name="Calendar" component={CalendarStackNavigator} />
       <Tab.Screen name="Teaching" component={TeachingScreen} />
       <Tab.Screen name="Shop" component={ShopScreen} />
     </Tab.Navigator>

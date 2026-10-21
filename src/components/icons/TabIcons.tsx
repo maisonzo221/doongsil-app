@@ -131,3 +131,59 @@ export function ShopIcon({ color, size }: IconProps) {
     </Base>
   );
 }
+
+// 수친 화면 상단 아이콘들 (하단 메뉴바 아이콘과 같은 라인 스타일)
+export function SearchIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Circle cx="10.8" cy="10.8" r="6.2" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path d="M15.5 15.5L20 20" stroke={color} strokeWidth={STROKE_WIDTH} strokeLinecap="round" />
+    </Base>
+  );
+}
+
+export function AddFriendIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Circle cx="9.6" cy="8.4" r="3.3" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path d="M3.4 19.6c0-3.5 2.8-6 6.2-6 1.4 0 2.6.4 3.6 1.1" stroke={color} strokeWidth={STROKE_WIDTH} strokeLinecap="round" />
+      <Path d="M17.6 11.2v6.4M14.4 14.4h6.4" stroke={color} strokeWidth={STROKE_WIDTH} strokeLinecap="round" />
+    </Base>
+  );
+}
+
+export function GearIcon({ color, size }: IconProps) {
+  return (
+    <Base size={size}>
+      <Circle cx="12" cy="12" r="3.1" stroke={color} strokeWidth={STROKE_WIDTH} />
+      <Path
+        d="M12 3.6l1.3 1.9 2.3-.4.9 2.2 2.2.9-.4 2.3 1.9 1.3-1.9 1.3.4 2.3-2.2.9-.9 2.2-2.3-.4L12 20.4l-1.3-1.9-2.3.4-.9-2.2-2.2-.9.4-2.3L3.8 12l1.9-1.3-.4-2.3 2.2-.9.9-2.2 2.3.4L12 3.6z"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinejoin="round"
+      />
+    </Base>
+  );
+}
+
+export function StarIcon({ color, size, filled }: IconProps & { filled?: boolean }) {
+  return (
+    <Base size={size}>
+      <Path
+        d="M12 3.8l2.5 5.1 5.6.8-4 3.9.9 5.6L12 16.6l-5 2.6.9-5.6-4-3.9 5.6-.8L12 3.8z"
+        stroke={color}
+        strokeWidth={STROKE_WIDTH}
+        strokeLinejoin="round"
+        fill={filled ? color : 'none'}
+      />
+    </Base>
+  );
+}
+
+export function ChevronIcon({ color, size, up }: IconProps & { up?: boolean }) {
+  return (
+    <Base size={size}>
+      <Path d={up ? 'M6 14.5l6-6 6 6' : 'M6 9.5l6 6 6-6'} stroke={color} strokeWidth={STROKE_WIDTH + 0.2} strokeLinecap="round" strokeLinejoin="round" />
+    </Base>
+  );
+}

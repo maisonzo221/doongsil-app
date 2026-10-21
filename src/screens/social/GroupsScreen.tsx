@@ -294,12 +294,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     color: colors.textMuted,
     fontSize: 12,
-    paddingHorizontal: spacing.lg,
     marginBottom: spacing.xs,
   },
   disabledNotice: { padding: spacing.lg, alignItems: 'center' },
   disabledText: { fontFamily: fonts.regular, color: colors.textMuted, textAlign: 'center' },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  list: { paddingBottom: spacing.xl },
   actionRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.xs },
   addRow: {
     flex: 1,

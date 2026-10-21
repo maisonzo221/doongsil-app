@@ -31,6 +31,8 @@ import {
   updateFriendCategory,
 } from '../../storage/social';
 import { getCurrentUser, syncContacts, updateNicknames, UserProfile } from '../../storage/auth';
+import { toggleFavoriteFriend, useFavoriteFriendIds } from '../../storage/favoriteFriends';
+import { AddFriendIcon, ChevronIcon, GearIcon, SearchIcon, StarIcon } from '../../components/icons/TabIcons';
 
 type Props = NativeStackScreenProps<FriendsStackParamList, 'FriendsHome'>;
 
@@ -70,25 +72,40 @@ export default function FriendsScreen({ navigation, route }: Props) {
   const [inviteCodeDraft, setInviteCodeDraft] = useState('');
   const [categoryTarget, setCategoryTarget] = useState<Friend | null>(null);
   const [categoryDraft, setCategoryDraft] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const favoriteIds = useFavoriteFriendIds();
 
+  // 카카오톡처럼: 즐겨찾는 친구 → (분류별) 친구 순서로, 제목 옆에 인원수를 보여주고 접었다 펼 수 있다.
   const sections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? friends.filter((f) => f.nicknameKo.toLowerCase().includes(q) || f.nicknameEn.toLowerCase().includes(q))
+      : friends;
+    const favSet = new Set(favoriteIds);
+    const sortByName = (arr: Friend[]) => [...arr].sort((a, b) => compareFriendNames(a.nicknameKo, b.nicknameKo));
+    const favs = list.filter((f) => favSet.has(f.id));
     const byCategory = new Map<string, Friend[]>();
-    for (const f of friends) {
+    for (const f of list) {
+      if (favSet.has(f.id)) continue;
       const key = f.category?.trim() || UNCATEGORIZED;
-      const list = byCategory.get(key) ?? [];
-      list.push(f);
-      byCategory.set(key, list);
+      const arr = byCategory.get(key) ?? [];
+      arr.push(f);
+      byCategory.set(key, arr);
     }
     const entries = Array.from(byCategory.entries()).sort(([a], [b]) => {
-      if (a === UNCATEGORIZED) return 1;
-      if (b === UNCATEGORIZED) return -1;
+      if (a === UNCATEGORIZED) return -1; // 분류 없는 친구("친구")를 맨 위에
+      if (b === UNCATEGORIZED) return 1;
       return a.localeCompare(b);
     });
-    return entries.map(([title, data]) => ({
-      title,
-      data: [...data].sort((a, b) => compareFriendNames(a.nicknameKo, b.nicknameKo)),
-    }));
-  }, [friends]);
+    const out: { key: string; title: string; count: number; data: Friend[] }[] = [];
+    if (favs.length > 0) out.push({ key: '__fav', title: '즐겨찾는 친구', count: favs.length, data: sortByName(favs) });
+    for (const [title, data] of entries) {
+      out.push({ key: title, title: title === UNCATEGORIZED ? '친구' : title, count: data.length, data: sortByName(data) });
+    }
+    return out.map((sec) => ({ ...sec, data: collapsed.has(sec.key) ? [] : sec.data }));
+  }, [friends, favoriteIds, query, collapsed]);
 
   const existingCategories = useMemo(
     () =>
@@ -248,99 +265,120 @@ export default function FriendsScreen({ navigation, route }: Props) {
     })
   ).current;
 
+  const favSetForRender = new Set(favoriteIds);
+
+  function toggleCollapsed(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   return (
     <ScreenBackground>
       <View style={styles.container}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>수친</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')} hitSlop={8}>
-            <Text style={styles.settingsIcon}>⚙️</Text>
+        {/* 카카오톡처럼: 내 프로필(왼쪽) + 검색 · 친구추가 · 설정(오른쪽) */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            style={styles.meWrap}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (!me) return;
+              setNicknameKoDraft(me.nicknameKo);
+              setNicknameEnDraft(me.nicknameEn);
+              setNicknameModal(true);
+            }}
+          >
+            <View style={styles.meAvatar}>
+              <Text style={styles.meAvatarText}>{(me?.nicknameKo ?? '나').slice(0, 1)}</Text>
+            </View>
+            <View style={styles.meBody}>
+              <Text style={styles.meName} numberOfLines={1}>
+                {me?.nicknameKo ?? '수친'}
+              </Text>
+              {me?.inviteCode ? <Text style={styles.meCode}>내 가입 코드 {me.inviteCode}</Text> : null}
+            </View>
           </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity hitSlop={8} onPress={() => setSearchOpen((v) => !v)} accessibilityLabel="친구 검색">
+              <SearchIcon color={colors.text} size={26} />
+            </TouchableOpacity>
+            <TouchableOpacity hitSlop={8} onPress={() => setAddModal(true)} accessibilityLabel="수친 추가">
+              <AddFriendIcon color={colors.text} size={26} />
+            </TouchableOpacity>
+            <TouchableOpacity hitSlop={8} onPress={() => navigation.navigate('Settings')} accessibilityLabel="설정">
+              <GearIcon color={colors.text} size={26} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.tabRow}>
           {(Object.keys(SUB_TAB_LABEL) as SubTab[]).map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.tabBtn, subTab === t && styles.tabBtnActive]}
-              onPress={() => setSubTab(t)}
-            >
-              <Text style={[styles.tabText, subTab === t && styles.tabTextActive]}>
-                {SUB_TAB_LABEL[t]}
-              </Text>
+            <TouchableOpacity key={t} style={[styles.tabBtn, subTab === t && styles.tabBtnActive]} onPress={() => setSubTab(t)}>
+              <Text style={[styles.tabText, subTab === t && styles.tabTextActive]}>{SUB_TAB_LABEL[t]}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* 수톡 탭에서는 방을 밀어서 나가는 동작과 겹치므로, 좌우로 밀어 탭을 넘기는 기능을 끈다. */}
         <View style={styles.flex} {...(subTab === 'sutok' ? {} : tabPanResponder.panHandlers)}>
-        {subTab === 'sutok' ? (
-          <GroupsScreen kind="sutok" navigation={navigation} />
-        ) : subTab === 'toktok' ? (
-          <GroupsScreen kind="toktok" navigation={navigation} />
-        ) : (
-          <>
-            {me && (
-              <TouchableOpacity
-                style={styles.profileCard}
-                onPress={() => {
-                  setNicknameKoDraft(me.nicknameKo);
-                  setNicknameEnDraft(me.nicknameEn);
-                  setNicknameModal(true);
-                }}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{me.nicknameKo.slice(0, 1)}</Text>
-                </View>
-                <View style={styles.profileBody}>
-                  <Text style={styles.profileName}>{me.nicknameKo} · {me.nicknameEn}</Text>
-                  {me.inviteCode ? (
-                    <Text style={styles.profileCode}>내 가입 코드: {me.inviteCode}</Text>
-                  ) : (
-                    <Text style={styles.profileCode}>Apple 로그인하면 가입 코드가 생겨요</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            )}
-
-            {disabled ? (
-              <View style={styles.disabledNotice}>
-                <Text style={styles.disabledText}>
-                  수친 기능은 Apple 로그인 계정에서만 사용할 수 있어요.
-                </Text>
-              </View>
-            ) : (
+          {subTab === 'sutok' ? (
+            <GroupsScreen kind="sutok" navigation={navigation} />
+          ) : subTab === 'toktok' ? (
+            <GroupsScreen kind="toktok" navigation={navigation} />
+          ) : disabled ? (
+            <View style={styles.disabledNotice}>
+              <Text style={styles.disabledText}>수친 기능은 Apple 로그인 계정에서만 사용할 수 있어요.</Text>
+            </View>
+          ) : (
+            <>
+              {searchOpen && (
+                <TextInput
+                  style={styles.searchInput}
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="이름으로 친구 찾기"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                />
+              )}
               <SectionList
                 sections={sections}
                 keyExtractor={(f) => f.id}
                 contentContainerStyle={styles.list}
-                ListHeaderComponent={
-                  <TouchableOpacity style={styles.addRow} onPress={() => setAddModal(true)}>
-                    <Text style={styles.addRowText}>+ 수친 추가하기</Text>
-                  </TouchableOpacity>
-                }
+                stickySectionHeadersEnabled={false}
                 renderSectionHeader={({ section }) => (
-                  <Text style={styles.categoryHeader}>{section.title}</Text>
+                  <TouchableOpacity style={styles.sectionHeader} activeOpacity={0.7} onPress={() => toggleCollapsed(section.key)}>
+                    <Text style={styles.sectionHeaderText}>
+                      {section.title} <Text style={styles.sectionCount}>{section.count}</Text>
+                    </Text>
+                    <ChevronIcon color={colors.textMuted} size={22} up={!collapsed.has(section.key)} />
+                  </TouchableOpacity>
                 )}
                 renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.friendCard} onPress={() => openCategoryModal(item)}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{item.nicknameKo.slice(0, 1)}</Text>
+                  <TouchableOpacity style={styles.friendRow} activeOpacity={0.7} onPress={() => openCategoryModal(item)}>
+                    <View style={styles.friendAvatar}>
+                      <Text style={styles.friendAvatarText}>{item.nicknameKo.slice(0, 1)}</Text>
                     </View>
                     <View style={styles.friendBody}>
                       <Text style={styles.friendName}>{item.nicknameKo}</Text>
                       <Text style={styles.friendNote}>{item.nicknameEn}</Text>
                     </View>
-                    <Text style={styles.categoryEditHint}>분류</Text>
+                    <TouchableOpacity hitSlop={10} onPress={() => toggleFavoriteFriend(item.id)} accessibilityLabel="즐겨찾기">
+                      <StarIcon color={favSetForRender.has(item.id) ? '#F5B301' : colors.border} size={24} filled={favSetForRender.has(item.id)} />
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 )}
                 ListEmptyComponent={
-                  <Text style={styles.empty}>아직 수친이 없어요. 연락처나 가입 코드로 추가해보세요.</Text>
+                  <Text style={styles.empty}>
+                    {query ? '찾는 친구가 없어요.' : '아직 수친이 없어요. 오른쪽 위 + 아이콘으로 연락처나 가입 코드로 추가해보세요.'}
+                  </Text>
                 }
               />
-            )}
-          </>
-        )}
+            </>
+          )}
         </View>
       </View>
 
@@ -500,11 +538,26 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.bold, fontSize: 28, color: colors.text },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   settingsIcon: { fontSize: 22 },
-  tabRow: { flexDirection: 'row', gap: spacing.hairline, marginBottom: spacing.sm },
-  tabBtn: { flex: 1, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.card, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: colors.primary },
-  tabText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
+  meWrap: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm },
+  meAvatar: { width: 46, height: 46, borderRadius: 17, backgroundColor: colors.aqua, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
+  meAvatarText: { color: colors.white, fontFamily: fonts.bold, fontSize: 18 },
+  meBody: { flex: 1 },
+  meName: { fontFamily: fonts.bold, color: colors.text, fontSize: 21 },
+  meCode: { fontFamily: fonts.regular, color: colors.blueSea, fontSize: 11, marginTop: 1 },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  tabRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
+  tabBtn: { paddingHorizontal: spacing.md, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: colors.card },
+  tabBtnActive: { backgroundColor: colors.deepSea },
+  tabText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 14 },
   tabTextActive: { color: colors.white },
+  searchInput: { backgroundColor: colors.card, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.xs, fontFamily: fonts.regular, color: colors.text },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs + 2, marginTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  sectionHeaderText: { fontFamily: fonts.bold, color: colors.text, fontSize: 14 },
+  sectionCount: { color: colors.textMuted, fontFamily: fonts.semibold },
+  friendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 9 },
+  friendAvatar: { width: 52, height: 52, borderRadius: 19, backgroundColor: colors.cardSoft, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs + 4 },
+  friendAvatarText: { color: colors.blueSea, fontFamily: fonts.bold, fontSize: 19 },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
