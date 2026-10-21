@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -63,7 +63,10 @@ export default function AuthScreen({ onAuthenticated }: Props) {
   }
 
   return (
-    <LinearGradient colors={colors.splashGradient} style={styles.fill}>
+    <View style={styles.fill}>
+      {/* 로딩 화면과 같은 북극곰 그림의 물 배경 위에, 글씨가 읽히도록 어둡게 덮는다. */}
+      <Image source={require('../../assets/landing/water.jpg')} style={styles.backdrop} resizeMode="cover" />
+      <LinearGradient colors={['rgba(11,42,74,0.35)', 'rgba(11,42,74,0.72)']} style={StyleSheet.absoluteFill} />
       <StatusBar style="light" />
       <View style={styles.content}>
         {step === 'signIn' ? (
@@ -115,12 +118,13 @@ export default function AuthScreen({ onAuthenticated }: Props) {
           </>
         )}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
+  fill: { flex: 1, backgroundColor: colors.splashBackground },
+  backdrop: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
   content: {
     flex: 1,
     alignItems: 'center',

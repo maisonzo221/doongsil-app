@@ -14,8 +14,8 @@ export const colors = {
   deepSeaGradient: ['#0B2A4A', '#04172A'] as const,
   // 로딩/로그인 화면. splashBackground는 app.json의 네이티브 스플래시 배경색과 같아야
   // 스플래시에서 로딩 화면으로 넘어갈 때 색이 튀지 않는다.
-  splashBackground: '#0B4F7C',
-  splashGradient: ['#0E6FA0', '#0B4F7C', '#0B2A4A'] as const,
+  splashBackground: '#3BACD5',
+  splashGradient: ['#2E9CCB', '#1B7DB0', '#0D5F8F'] as const,
   card: '#FFFFFF',
   cardSoft: '#EAF6F9',
 
