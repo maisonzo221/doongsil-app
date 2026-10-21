@@ -2,31 +2,60 @@ import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Image, Pressable, View } from 'react-native';
 import type { Equipped } from '../../storage/bear';
 
-// 둥실곰: 캐릭터 보드(assets/bear)의 그림을 그대로 쓴다.
-// - 서 있는 모습(정면): front.png 위에 수영복/수경/수모/메달을 같은 크기의 캔버스로 겹쳐 입힌다.
-// - 헤엄치는 모습: 자유형·접영·평영·배영 4장을 번갈아 보여준다.
+// 둥실곰: 캐릭터 보드(assets/bear)의 그림을 그대로 쓴다. 덧그린 것은 없다.
+// - 입은 것에 따라 보드 그림이 통째로 바뀐다: 기본 / 수모 / 메달 / 수모+메달(수모 그림에 메달 부분만 오려 붙임).
+// - 서 있는 모습(정면)과, 헤엄치는 모습(자유형·접영·평영·배영을 번갈아)을 쓴다.
 
 export type BearMode = 'idle' | 'swim';
 
-const FRONT = { w: 271, h: 482 };
-const SWIM = [
-  { src: require('../../../assets/bear/swim-free.png'), w: 396, h: 161 },
-  { src: require('../../../assets/bear/swim-fly.png'), w: 366, h: 165 },
-  { src: require('../../../assets/bear/swim-breast.png'), w: 302, h: 162 },
-  { src: require('../../../assets/bear/swim-back.png'), w: 388, h: 157 },
-];
-const SWIM_BOX = { w: 396, h: 165 };
+type Variant = 'base' | 'cap' | 'medal' | 'capmedal';
+type SwimPose = 'free' | 'fly' | 'breast' | 'back';
+const SWIM_POSES: SwimPose[] = ['free', 'fly', 'breast', 'back'];
+
+// 포즈마다 모든 변형이 같은 크기의 캔버스에 놓여 있어서, 옷을 바꿔 입어도 곰 위치가 그대로다.
+const FRONT = { w: 262, h: 475 };
+const SWIM_SIZE: Record<SwimPose, { w: number; h: number }> = {
+  free: { w: 407, h: 204 },
+  fly: { w: 367, h: 191 },
+  breast: { w: 303, h: 200 },
+  back: { w: 392, h: 179 },
+};
+const SWIM_BOX = { w: 407, h: 204 };
 const SWIM_HOLD_MS = 4200;
 const SWIM_FADE_MS = 600;
 
-const IMG = {
-  front: require('../../../assets/bear/front.png'),
-  trunks: require('../../../assets/bear/item-trunks.png'),
-  onepiece: require('../../../assets/bear/item-onepiece.png'),
-  goggles: require('../../../assets/bear/item-goggles.png'),
-  cap: require('../../../assets/bear/item-cap.png'),
-  medal: require('../../../assets/bear/item-medal.png'),
+const FRONT_IMG: Record<Variant, number> = {
+  base: require('../../../assets/bear/base-front.png'),
+  cap: require('../../../assets/bear/cap-front.png'),
+  medal: require('../../../assets/bear/medal-front.png'),
+  capmedal: require('../../../assets/bear/capmedal-front.png'),
 };
+// 수모와 메달을 같이 한 헤엄 그림은 아직 없어서, 둘 다 입었으면 수모 그림을 쓴다.
+const SWIM_IMG: Record<'base' | 'cap' | 'medal', Record<SwimPose, number>> = {
+  base: {
+    free: require('../../../assets/bear/base-free.png'),
+    fly: require('../../../assets/bear/base-fly.png'),
+    breast: require('../../../assets/bear/base-breast.png'),
+    back: require('../../../assets/bear/base-back.png'),
+  },
+  cap: {
+    free: require('../../../assets/bear/cap-free.png'),
+    fly: require('../../../assets/bear/cap-fly.png'),
+    breast: require('../../../assets/bear/cap-breast.png'),
+    back: require('../../../assets/bear/cap-back.png'),
+  },
+  medal: {
+    free: require('../../../assets/bear/medal-free.png'),
+    fly: require('../../../assets/bear/medal-fly.png'),
+    breast: require('../../../assets/bear/medal-breast.png'),
+    back: require('../../../assets/bear/medal-back.png'),
+  },
+};
+
+function variantOf(e: Equipped): Variant {
+  if (e.cap && e.medal) return 'capmedal';
+  return e.cap ? 'cap' : e.medal ? 'medal' : 'base';
+}
 
 /** 곰이 차지하는 상자 크기. 헤엄치는 모습은 가로로 길다. */
 export function bearBox(mode: BearMode, height: number): { width: number; height: number; scale: number } {
@@ -50,16 +79,18 @@ interface Props {
   onPress?: () => void;
 }
 
-function SwimBear({ height, paused }: { height: number; paused?: boolean }) {
+function SwimBear({ height, equipped, paused }: { height: number; equipped: Equipped; paused?: boolean }) {
   const box = bearBox('swim', height);
-  const fades = useRef(SWIM.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
+  const v = variantOf(equipped);
+  const set = SWIM_IMG[v === 'capmedal' ? 'cap' : v];
+  const fades = useRef(SWIM_POSES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
   const current = useRef(0);
 
   useEffect(() => {
     if (paused) return;
     const timer = setInterval(() => {
       const from = current.current;
-      const to = (from + 1) % SWIM.length;
+      const to = (from + 1) % SWIM_POSES.length;
       current.current = to;
       Animated.parallel([
         Animated.timing(fades[from], { toValue: 0, duration: SWIM_FADE_MS, useNativeDriver: true }),
@@ -71,20 +102,23 @@ function SwimBear({ height, paused }: { height: number; paused?: boolean }) {
 
   return (
     <View style={{ width: box.width, height: box.height }} pointerEvents="none">
-      {SWIM.map((p, i) => (
-        <Animated.Image
-          key={i}
-          source={p.src}
-          style={{
-            position: 'absolute',
-            left: (box.width - p.w * box.scale) / 2,
-            top: (box.height - p.h * box.scale) / 2,
-            width: p.w * box.scale,
-            height: p.h * box.scale,
-            opacity: fades[i],
-          }}
-        />
-      ))}
+      {SWIM_POSES.map((pose, i) => {
+        const size = SWIM_SIZE[pose];
+        return (
+          <Animated.Image
+            key={pose}
+            source={set[pose]}
+            style={{
+              position: 'absolute',
+              left: (box.width - size.w * box.scale) / 2,
+              top: (box.height - size.h * box.scale) / 2,
+              width: size.w * box.scale,
+              height: size.h * box.scale,
+              opacity: fades[i],
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -161,11 +195,7 @@ function StandingBear({ height, equipped, interactive, paused, onPress }: Omit<P
   const body = (
     <View style={{ width: box.width, height: box.height }} pointerEvents="none">
       <Animated.View style={[stageStyle, { transform }]}>
-        <Image source={IMG.front} style={layer} />
-        {equipped.suit ? <Image source={IMG[equipped.suit]} style={layer} /> : null}
-        {equipped.medal ? <Image source={IMG.medal} style={layer} /> : null}
-        {equipped.goggles ? <Image source={IMG.goggles} style={layer} /> : null}
-        {equipped.cap ? <Image source={IMG.cap} style={layer} /> : null}
+        <Image source={FRONT_IMG[variantOf(equipped)]} style={layer} />
       </Animated.View>
     </View>
   );
@@ -179,7 +209,7 @@ function StandingBear({ height, equipped, interactive, paused, onPress }: Omit<P
 }
 
 function BearSpriteBase({ mode, ...rest }: Props) {
-  if (mode === 'swim') return <SwimBear height={rest.height} paused={rest.paused} />;
+  if (mode === 'swim') return <SwimBear height={rest.height} equipped={rest.equipped} paused={rest.paused} />;
   return <StandingBear {...rest} />;
 }
 

@@ -13,7 +13,7 @@ const WATER_TOP = 18; // 아이콘 줄 위쪽으로 확보한 물 영역 (아이
 const ROW = 60; // 아이콘 줄 높이
 const HILL_H = 24; // 가운데 메뉴가 솟아오른 높이
 const HILL_B = 66; // 솟아오른 부분의 가로 반폭
-const BEAR_H = 30; // 메뉴 아이콘 하나쯤의 크기
+const BEAR_H = 34; // 메뉴 아이콘 하나쯤의 크기
 // 그림(water.jpg)에서 곰이 없는 물 부분을 잘라 쓴다 (그림 픽셀 좌표).
 const PAINT_W = 1003;
 const PAINT_H = 1534;

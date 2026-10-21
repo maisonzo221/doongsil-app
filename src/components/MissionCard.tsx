@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import BearStamp from './BearStamp';
 import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
-import { ITEM_IMAGES } from '../data/itemImages';
+import { hasItemArt, ITEM_EMOJI, ITEM_IMAGES } from '../data/itemImages';
 import { completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
 import type { CompleteResult } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
@@ -182,7 +182,11 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                   {reward.gained.map((id) => (
                     <View key={id} style={styles.rewardItem}>
                       <View style={styles.rewardThumb}>
-                        <Image source={ITEM_IMAGES[id]} style={styles.rewardImg} resizeMode="contain" />
+                        {ITEM_IMAGES[id] != null ? (
+                          <Image source={ITEM_IMAGES[id]} style={styles.rewardImg} resizeMode="contain" />
+                        ) : (
+                          <Text style={styles.rewardEmoji}>{ITEM_EMOJI[id]}</Text>
+                        )}
                       </View>
                       <Text style={styles.rewardName}>{ITEMS[id].name}</Text>
                     </View>
@@ -192,17 +196,15 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                   <TouchableOpacity style={styles.secondaryBtn} onPress={() => setReward(null)}>
                     <Text style={styles.secondaryBtnText}>확인</Text>
                   </TouchableOpacity>
-                  {reward.gained.length > 0 && (
+                  {reward.gained.some(hasItemArt) && (
                     <TouchableOpacity
                       style={styles.primaryBtn}
                       onPress={async () => {
                         // 받은 아이템 중 바로 입을 수 있는 것을 입혀준다(수영복은 팬티가 기본).
                         const patch: Record<string, unknown> = {};
                         for (const id of reward.gained) {
-                          if (id === 'trunks' && !patch.suit) patch.suit = 'trunks';
-                          else if (id === 'onepiece' && !patch.suit) patch.suit = 'onepiece';
-                          else if (id === 'goggles') patch.goggles = true;
-                          else if (id === 'cap') patch.cap = true;
+                          // 수영복·수경은 아직 그림이 없어서 입히지 않는다.
+                          if (id === 'cap') patch.cap = true;
                           else if (id === 'medal') patch.medal = true;
                         }
                         await setEquipped(patch);
@@ -357,5 +359,6 @@ const styles = StyleSheet.create({
   rewardItem: { alignItems: 'center', width: 96 },
   rewardThumb: { width: 84, height: 84, borderRadius: 42, backgroundColor: colors.cardSoft, alignItems: 'center', justifyContent: 'center' },
   rewardImg: { width: 64, height: 64 },
+  rewardEmoji: { fontSize: 40 },
   rewardName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 12, marginTop: 6, textAlign: 'center' },
 });

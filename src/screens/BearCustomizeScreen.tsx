@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ScreenBackground from '../components/ScreenBackground';
 import BearSprite from '../components/bear/BearSprite';
 import { ITEMS, ItemId, LEVEL_NAMES } from '../data/missions';
-import { ITEM_IMAGES } from '../data/itemImages';
+import { hasItemArt, ITEM_EMOJI, ITEM_IMAGES } from '../data/itemImages';
 import { levelOf, setEquipped, useBearState } from '../storage/bear';
 import type { Equipped } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
@@ -65,24 +65,29 @@ export default function BearCustomizeScreen() {
               <View style={styles.tiles}>
                 {slot.items.map((id) => {
                   const owned = bear.owned.includes(id);
+                  const art = hasItemArt(id);
                   const on = current === id;
                   return (
                     <Pressable
                       key={id}
-                      disabled={!owned}
+                      disabled={!owned || !art}
                       onPress={() => setEquipped(slot.patch(on ? null : id))}
                       style={[styles.tile, on && styles.tileOn, !owned && styles.tileLocked]}
                       accessibilityRole="button"
                       accessibilityLabel={`${ITEMS[id].name}${owned ? '' : ' (미션 보상)'}`}
                     >
                       <View style={styles.thumb}>
-                        <Image source={ITEM_IMAGES[id]} style={[styles.thumbImg, !owned && { opacity: 0.25 }]} resizeMode="contain" />
+                        {art ? (
+                          <Image source={ITEM_IMAGES[id]} style={[styles.thumbImg, !owned && { opacity: 0.25 }]} resizeMode="contain" />
+                        ) : (
+                          <Text style={[styles.emoji, !owned && { opacity: 0.25 }]}>{ITEM_EMOJI[id]}</Text>
+                        )}
                         {!owned && <Text style={styles.lock}>🔒</Text>}
                       </View>
                       <Text style={styles.tileName} numberOfLines={2}>
                         {ITEMS[id].name}
                       </Text>
-                      <Text style={[styles.tileState, on && styles.tileStateOn]}>{!owned ? '미션 보상' : on ? '입는 중' : '입기'}</Text>
+                      <Text style={[styles.tileState, on && styles.tileStateOn]}>{!owned ? '미션 보상' : !art ? '그림 준비 중' : on ? '입는 중' : '입기'}</Text>
                     </Pressable>
                   );
                 })}
@@ -110,6 +115,7 @@ const styles = StyleSheet.create({
   tileLocked: { opacity: 0.9 },
   thumb: { width: 84, height: 84, borderRadius: 42, backgroundColor: '#CFEBF6', alignItems: 'center', justifyContent: 'center' },
   thumbImg: { width: 64, height: 64 },
+  emoji: { fontSize: 38 },
   lock: { position: 'absolute', fontSize: 22 },
   tileName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 12, marginTop: 6, textAlign: 'center' },
   tileState: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginTop: 2 },

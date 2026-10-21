@@ -15,8 +15,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   trunks: { id: 'trunks', name: '검정 숏 사각 팬티', slot: 'suit', desc: '기본 수영복' },
   onepiece: { id: 'onepiece', name: '검정 원피스 수영복', slot: 'suit', desc: '기본 수영복 (미드컷)' },
   goggles: { id: 'goggles', name: '파랑 수경', slot: 'goggles', desc: '푸른 렌즈 수경' },
-  cap: { id: 'cap', name: '흰 수모', slot: 'cap', desc: '하얀 실리콘 수모' },
-  medal: { id: 'medal', name: '초급 메달', slot: 'medal', desc: '초급 승급 기념 동메달' },
+  cap: { id: 'cap', name: '파랑 곰 수모', slot: 'cap', desc: '둥실곰 로고가 붙은 파란 수모' },
+  medal: { id: 'medal', name: '초급 메달', slot: 'medal', desc: '초급 승급 기념 금메달' },
 };
 
 export type MissionKind =
