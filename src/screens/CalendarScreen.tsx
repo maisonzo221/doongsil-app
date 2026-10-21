@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,12 +8,14 @@ import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
 import RecordCard from '../components/RecordCard';
 import MissionCard from '../components/MissionCard';
+import BearSprite from '../components/bear/BearSprite';
 import ActivityRings, { MiniActivityRing } from '../components/ActivityRings';
 import RoutineRecommendations from '../components/RoutineRecommendations';
 import { NotingIcon } from '../components/icons/TabIcons';
 import { SwimRecord } from '../types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
+import { markIntroSeen, useBearState } from '../storage/bear';
 import { pushMyStats } from '../storage/profileStats';
 import {
   getMonthActivitySummaries,
@@ -54,6 +56,9 @@ export default function CalendarScreen({ navigation }: Props) {
     swimMeters: 0,
   });
   const [monthActivity, setMonthActivity] = useState<Record<string, TodayActivitySummary>>({});
+  const bear = useBearState();
+  const [introOpen, setIntroOpen] = useState(false);
+  const introChecked = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,6 +102,16 @@ export default function CalendarScreen({ navigation }: Props) {
   const distanceLabel = useMemo(() => totalDistanceLabel(records), [records]);
   const recentRecords = useMemo(() => records.slice(0, RECENT_COUNT), [records]);
 
+  // 처음 들어왔을 때 한 번만 내 둥실곰을 소개한다.
+  useEffect(() => {
+    if (introChecked.current) return;
+    // 저장된 값을 읽은 뒤(기본값이 아니라 진짜 값일 때)에 판단하려고 잠깐 기다린다.
+    const t = setTimeout(() => {
+      introChecked.current = true;
+      if (!bear.introSeen) setIntroOpen(true);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [bear.introSeen]);
 
   const selectedRecords = selectedDate ? recordsByDate.get(selectedDate) ?? [] : [];
   const selectedDaySwimMeters = selectedRecords.reduce((sum, r) => sum + (r.distanceMeters ?? 0), 0);
@@ -111,6 +126,7 @@ export default function CalendarScreen({ navigation }: Props) {
   return (
     <ScreenBackground>
       <ScrollView style={styles.container} contentContainerStyle={styles.containerContent}>
+        {/* 날짜 + 오른쪽에 내 둥실곰 (누르면 폴짝) */}
         <View style={styles.topRow}>
           <View style={styles.dateCol}>
             <Text style={styles.dateText}>
@@ -118,6 +134,7 @@ export default function CalendarScreen({ navigation }: Props) {
             </Text>
             <Text style={styles.weekdayText}>{header.weekday}</Text>
           </View>
+          <BearSprite mode="idle" height={120} equipped={bear.equipped} interactive />
         </View>
 
         <View style={styles.ringsCard}>
@@ -135,6 +152,7 @@ export default function CalendarScreen({ navigation }: Props) {
         <MissionCard
           recordCount={records.length}
           onAddRecord={() => navigation.navigate('RecordForm')}
+          onOpenCustomize={() => navigation.navigate('BearCustomize')}
         />
 
         <View style={styles.streakRow}>
@@ -286,6 +304,26 @@ export default function CalendarScreen({ navigation }: Props) {
         </View>
       </Modal>
 
+      <Modal visible={introOpen} transparent animationType="fade" onRequestClose={() => setIntroOpen(false)}>
+        <View style={styles.introBackdrop}>
+          <View style={styles.introCard}>
+            <Text style={styles.introTitle}>내 둥실곰을 만나보세요!</Text>
+            <BearSprite mode="idle" height={210} equipped={bear.equipped} interactive />
+            <Text style={styles.introBody}>
+              곰을 누르면 폴짝 뛰어요.{'\n'}미션을 하나씩 마치면 수영복, 수모, 수경을 받아{'\n'}곰을 꾸며줄 수 있어요.
+            </Text>
+            <TouchableOpacity
+              style={styles.introBtn}
+              onPress={() => {
+                setIntroOpen(false);
+                markIntroSeen();
+              }}
+            >
+              <Text style={styles.introBtnText}>시작하기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScreenBackground>
   );
 }
@@ -302,10 +340,16 @@ function StatTile({ label, value, onPress }: { label: string; value: string; onP
 const styles = StyleSheet.create({
   container: { flex: 1 },
   containerContent: { padding: spacing.lg, paddingBottom: spacing.xl },
-  topRow: { marginBottom: spacing.xs },
-  dateCol: { paddingTop: spacing.sm, paddingBottom: spacing.xs },
+  topRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 },
+  dateCol: { flex: 1, paddingBottom: spacing.sm },
   dateText: { fontFamily: fonts.bold, color: colors.text, fontSize: 22, lineHeight: 28 },
   weekdayText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 15, marginTop: 4, letterSpacing: 2 },
+  introBackdrop: { flex: 1, backgroundColor: 'rgba(11,42,74,0.5)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+  introCard: { width: '100%', backgroundColor: colors.card, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center' },
+  introTitle: { fontFamily: fonts.bold, color: colors.text, fontSize: 20, marginBottom: spacing.xs },
+  introBody: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 13, lineHeight: 20, textAlign: 'center', marginVertical: spacing.xs },
+  introBtn: { alignSelf: 'stretch', backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 12, alignItems: 'center', marginTop: spacing.xs },
+  introBtnText: { fontFamily: fonts.bold, color: colors.white, fontSize: 15 },
   streakRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -79,12 +79,3 @@ export const ETIQUETTE_LIST = [
 
 /** 승급(레벨) 이름. 초급을 마치면 Lv.2 중급 도전. */
 export const LEVEL_NAMES = ['초보 둥실곰', '중급 둥실곰', '상급 둥실곰', '마스터즈 둥실곰'];
-
-/** 아이템 그림이 들어오기 전까지 쓰는 임시 아이콘. */
-export const ITEM_EMOJI: Record<ItemId, string> = {
-  trunks: '🩳',
-  onepiece: '👙',
-  goggles: '🥽',
-  cap: '🧢',
-  medal: '🏅',
-};

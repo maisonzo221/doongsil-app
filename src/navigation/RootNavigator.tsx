@@ -17,6 +17,7 @@ import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
 import SettingsScreen from '../screens/social/SettingsScreen';
+import BearCustomizeScreen from '../screens/BearCustomizeScreen';
 import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
 import WaterTabBar from '../components/WaterTabBar';
 import { colors } from '../theme';
@@ -71,6 +72,11 @@ function CalendarStackNavigator() {
         options={{ headerShown: true, title: '기록 상세', headerBackButtonDisplayMode: 'minimal' }}
       />
       <CalendarStack.Screen
+        name="BearCustomize"
+        component={BearCustomizeScreen}
+        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <CalendarStack.Screen
         name="StatDetail"
         component={StatDetailScreen}
         options={{ headerShown: false }}
@@ -87,6 +93,11 @@ function FriendsStackNavigator() {
         name="ChatRoom"
         component={ChatRoomScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <FriendsStack.Screen
+        name="BearCustomize"
+        component={BearCustomizeScreen}
+        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
       />
       <FriendsStack.Screen
         name="Settings"
