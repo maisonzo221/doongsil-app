@@ -1,21 +1,10 @@
 import type { ItemId } from './missions';
 
-// 캐릭터 보드 그림이 있는 아이템만 곰 위에 보인다. 나머지(수영복·수경)는 보드가 오면 추가한다.
-export const ITEM_IMAGES: Partial<Record<ItemId, number>> = {
+// 아이템 아이콘: 캐릭터 보드 그림에서 아이템 부분만 오려낸 것.
+export const ITEM_IMAGES: Record<ItemId, number> = {
+  trunks: require('../../assets/items/trunks.png'),
+  onepiece: require('../../assets/items/onepiece.png'),
+  goggles: require('../../assets/items/goggles.png'),
   cap: require('../../assets/items/cap.png'),
   medal: require('../../assets/items/medal.png'),
 };
-
-/** 그림이 아직 없는 아이템의 임시 아이콘. */
-export const ITEM_EMOJI: Record<ItemId, string> = {
-  trunks: '🩳',
-  onepiece: '👙',
-  goggles: '🥽',
-  cap: '🧢',
-  medal: '🏅',
-};
-
-/** 곰에게 입혀서 보이는 그림이 있는지. */
-export function hasItemArt(id: ItemId): boolean {
-  return ITEM_IMAGES[id] != null;
-}

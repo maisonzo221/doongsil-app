@@ -3,56 +3,100 @@ import { Animated, Easing, Image, Pressable, View } from 'react-native';
 import type { Equipped } from '../../storage/bear';
 
 // 둥실곰: 캐릭터 보드(assets/bear)의 그림을 그대로 쓴다. 덧그린 것은 없다.
-// - 입은 것에 따라 보드 그림이 통째로 바뀐다: 기본 / 수모 / 메달. 새 아이템 보드가 오면 여기에 한 줄씩 추가한다.
-// - 서 있는 모습(정면)과, 헤엄치는 모습(자유형·접영·평영·배영을 번갈아)을 쓴다.
+// - 서 있는 모습(정면): 기본 곰 위에, 입은 아이템(수영복·메달·수모·수경)을 보드 그림에서 오려낸 조각으로 겹쳐서 보여준다.
+//   조각은 모두 같은 크기의 캔버스라서 겹쳐 놓기만 하면 맞고, 여러 개를 동시에 입을 수 있다.
+// - 헤엄치는 모습(자유형·접영·평영·배영): 보드가 한 장씩이라, 입은 것과 가장 비슷한 보드 그림을 고른다.
 
 export type BearMode = 'idle' | 'swim';
 
-type Variant = 'base' | 'cap' | 'medal';
 type SwimPose = 'free' | 'fly' | 'breast' | 'back';
+type SwimVariant = 'base' | 'cap' | 'medal' | 'onepiece' | 'trunks';
 const SWIM_POSES: SwimPose[] = ['free', 'fly', 'breast', 'back'];
 
-// 포즈마다 모든 변형이 같은 크기의 캔버스에 놓여 있어서, 옷을 바꿔 입어도 곰 위치가 그대로다.
-const FRONT = { w: 262, h: 475 };
+const FRONT = { w: 290, h: 509 };
 const SWIM_SIZE: Record<SwimPose, { w: number; h: number }> = {
-  free: { w: 407, h: 204 },
-  fly: { w: 367, h: 191 },
-  breast: { w: 303, h: 200 },
-  back: { w: 392, h: 179 },
+  free: { w: 411, h: 220 },
+  fly: { w: 374, h: 207 },
+  breast: { w: 310, h: 205 },
+  back: { w: 392, h: 189 },
 };
-const SWIM_BOX = { w: 407, h: 204 };
+const SWIM_BOX = { w: 411, h: 220 };
 const SWIM_HOLD_MS = 4200;
 const SWIM_FADE_MS = 600;
 
-const FRONT_IMG: Record<Variant, number> = {
-  base: require('../../../assets/bear/base-front.png'),
-  cap: require('../../../assets/bear/cap-front.png'),
-  medal: require('../../../assets/bear/medal-front.png'),
+const FRONT_BASE = require('../../../assets/bear/front-base.png');
+const FRONT_LAYER = {
+  onepiece: require('../../../assets/bear/front-onepiece.png'),
+  trunks: require('../../../assets/bear/front-trunks.png'),
+  medal: require('../../../assets/bear/front-medal.png'),
+  cap: require('../../../assets/bear/front-cap.png'),
+  goggles: require('../../../assets/bear/front-goggles.png'),
 };
-const SWIM_IMG: Record<Variant, Record<SwimPose, number>> = {
+const SWIM_IMG: Record<SwimVariant, Record<SwimPose, number>> = {
   base: {
-    free: require('../../../assets/bear/base-free.png'),
-    fly: require('../../../assets/bear/base-fly.png'),
-    breast: require('../../../assets/bear/base-breast.png'),
-    back: require('../../../assets/bear/base-back.png'),
+    free: require('../../../assets/bear/swim-base-free.png'),
+    fly: require('../../../assets/bear/swim-base-fly.png'),
+    breast: require('../../../assets/bear/swim-base-breast.png'),
+    back: require('../../../assets/bear/swim-base-back.png'),
   },
   cap: {
-    free: require('../../../assets/bear/cap-free.png'),
-    fly: require('../../../assets/bear/cap-fly.png'),
-    breast: require('../../../assets/bear/cap-breast.png'),
-    back: require('../../../assets/bear/cap-back.png'),
+    free: require('../../../assets/bear/swim-cap-free.png'),
+    fly: require('../../../assets/bear/swim-cap-fly.png'),
+    breast: require('../../../assets/bear/swim-cap-breast.png'),
+    back: require('../../../assets/bear/swim-cap-back.png'),
   },
   medal: {
-    free: require('../../../assets/bear/medal-free.png'),
-    fly: require('../../../assets/bear/medal-fly.png'),
-    breast: require('../../../assets/bear/medal-breast.png'),
-    back: require('../../../assets/bear/medal-back.png'),
+    free: require('../../../assets/bear/swim-medal-free.png'),
+    fly: require('../../../assets/bear/swim-medal-fly.png'),
+    breast: require('../../../assets/bear/swim-medal-breast.png'),
+    back: require('../../../assets/bear/swim-medal-back.png'),
+  },
+  onepiece: {
+    free: require('../../../assets/bear/swim-onepiece-free.png'),
+    fly: require('../../../assets/bear/swim-onepiece-fly.png'),
+    breast: require('../../../assets/bear/swim-onepiece-breast.png'),
+    back: require('../../../assets/bear/swim-onepiece-back.png'),
+  },
+  trunks: {
+    free: require('../../../assets/bear/swim-trunks-free.png'),
+    fly: require('../../../assets/bear/swim-trunks-fly.png'),
+    breast: require('../../../assets/bear/swim-trunks-breast.png'),
+    back: require('../../../assets/bear/swim-trunks-back.png'),
   },
 };
+// 각 헤엄 보드 그림에 그려져 있는 것들. (수영복 보드에는 수모와 수경도 같이 그려져 있다.)
+const SWIM_SHOWS: Record<SwimVariant, string[]> = {
+  base: [],
+  cap: ['cap'],
+  medal: ['medal'],
+  onepiece: ['suit', 'cap', 'goggles'],
+  trunks: ['suit', 'cap', 'goggles'],
+};
 
-// 보드 그림이 있는 아이템만 보인다. 보드 한 장에 한 가지 아이템만 입고 있어서 한 번에 한 가지만 입는다.
-function variantOf(e: Equipped): Variant {
-  return e.cap ? 'cap' : e.medal ? 'medal' : 'base';
+/** 입은 것(수영복·수경·수모·메달)과 가장 비슷하게 그려진 헤엄 보드를 고른다. */
+function swimVariantOf(e: Equipped): SwimVariant {
+  const want = new Set<string>();
+  if (e.suit) want.add('suit');
+  if (e.goggles) want.add('goggles');
+  if (e.cap) want.add('cap');
+  if (e.medal) want.add('medal');
+  let best: SwimVariant = 'base';
+  let bestScore = -Infinity;
+  for (const v of Object.keys(SWIM_SHOWS) as SwimVariant[]) {
+    // 수영복은 입은 종류와 같은 보드를 우선한다.
+    if ((v === 'onepiece' || v === 'trunks') && e.suit && v !== e.suit) continue;
+    const shown = SWIM_SHOWS[v];
+    // 수영복이 가장 눈에 띄어서 비중을 크게 둔다.
+    const weight = (x: string) => (x === 'suit' ? 2 : 1);
+    const hit = shown.filter((x) => want.has(x)).reduce((n, x) => n + weight(x), 0);
+    const extra = shown.filter((x) => !want.has(x)).length;
+    const score = hit - extra * 0.5;
+    if (score > bestScore) {
+      bestScore = score;
+      best = v;
+    }
+  }
+  return best;
 }
 
 /** 곰이 차지하는 상자 크기. 헤엄치는 모습은 가로로 길다. */
@@ -79,7 +123,7 @@ interface Props {
 
 function SwimBear({ height, equipped, paused }: { height: number; equipped: Equipped; paused?: boolean }) {
   const box = bearBox('swim', height);
-  const v = variantOf(equipped);
+  const v = swimVariantOf(equipped);
   const set = SWIM_IMG[v];
   const fades = useRef(SWIM_POSES.map((_, i) => new Animated.Value(i === 0 ? 1 : 0))).current;
   const current = useRef(0);
@@ -193,7 +237,11 @@ function StandingBear({ height, equipped, interactive, paused, onPress }: Omit<P
   const body = (
     <View style={{ width: box.width, height: box.height }} pointerEvents="none">
       <Animated.View style={[stageStyle, { transform }]}>
-        <Image source={FRONT_IMG[variantOf(equipped)]} style={layer} />
+        <Image source={FRONT_BASE} style={layer} />
+        {equipped.suit ? <Image source={FRONT_LAYER[equipped.suit]} style={layer} /> : null}
+        {equipped.medal ? <Image source={FRONT_LAYER.medal} style={layer} /> : null}
+        {equipped.cap ? <Image source={FRONT_LAYER.cap} style={layer} /> : null}
+        {equipped.goggles ? <Image source={FRONT_LAYER.goggles} style={layer} /> : null}
       </Animated.View>
     </View>
   );

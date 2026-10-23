@@ -74,17 +74,7 @@ export async function syncAutoMissions(recordCount: number): Promise<CompleteRes
 
 export async function setEquipped(patch: Partial<Equipped>): Promise<void> {
   const state = await getBearState();
-  let equipped = { ...state.equipped, ...patch };
-  // 아이템 그림은 한 가지씩만 입은 보드 그림이라, 새로 입히면 입고 있던 것은 벗는다.
-  const turnedOn = patch.suit ? 'suit' : patch.goggles ? 'goggles' : patch.cap ? 'cap' : patch.medal ? 'medal' : null;
-  if (turnedOn) {
-    equipped = {
-      suit: turnedOn === 'suit' ? equipped.suit : null,
-      goggles: turnedOn === 'goggles',
-      cap: turnedOn === 'cap',
-      medal: turnedOn === 'medal',
-    };
-  }
+  const equipped = { ...state.equipped, ...patch };
   // 가지고 있지 않은 아이템은 입을 수 없다.
   if (equipped.suit && !state.owned.includes(equipped.suit)) equipped.suit = null;
   if (equipped.goggles && !state.owned.includes('goggles')) equipped.goggles = false;
