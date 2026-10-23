@@ -2,7 +2,8 @@
 // 지금은 초급(첫 5개 미션)만 열려 있고, 중급 이상은 이 배열에 티어를 추가하면 화면이 알아서 이어 붙는다.
 
 export type SuitId = 'trunks' | 'onepiece';
-export type ItemId = SuitId | 'goggles' | 'cap' | 'medal';
+export type MedalId = 'medal1' | 'medal2' | 'medal3' | 'medal4';
+export type ItemId = SuitId | 'goggles' | 'cap' | MedalId;
 
 export interface ItemDef {
   id: ItemId;
@@ -12,11 +13,14 @@ export interface ItemDef {
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
-  trunks: { id: 'trunks', name: '검정 숏 사각 팬티', slot: 'suit', desc: '기본 수영복' },
-  onepiece: { id: 'onepiece', name: '검정 원피스 수영복', slot: 'suit', desc: '기본 수영복 (미드컷)' },
+  trunks: { id: 'trunks', name: '남자 숏사각 수영복', slot: 'suit', desc: '기본 수영복' },
+  onepiece: { id: 'onepiece', name: '여자 원피스 수영복', slot: 'suit', desc: '기본 수영복 (미드컷)' },
   goggles: { id: 'goggles', name: '파랑 수경', slot: 'goggles', desc: '푸른 렌즈 수경' },
   cap: { id: 'cap', name: '파랑 곰 수모', slot: 'cap', desc: '둥실곰 로고가 붙은 파란 수모' },
-  medal: { id: 'medal', name: '초급 메달', slot: 'medal', desc: '초급 승급 기념 금메달' },
+  medal1: { id: 'medal1', name: '초급 메달', slot: 'medal', desc: '초급 승급 기념 메달 (초록 리본)' },
+  medal2: { id: 'medal2', name: '중급 메달', slot: 'medal', desc: '중급 승급 기념 은메달 (파랑 리본)' },
+  medal3: { id: 'medal3', name: '상급 메달', slot: 'medal', desc: '상급 승급 기념 동메달 (빨강 리본)' },
+  medal4: { id: 'medal4', name: '마스터즈 메달', slot: 'medal', desc: '마스터즈 승급 기념 금메달 (노랑 리본)' },
 };
 
 export type MissionKind =
@@ -52,7 +56,7 @@ export const TIERS: TierDef[] = [
   {
     id: 'beginner',
     name: '초급',
-    reward: ['medal'],
+    reward: ['medal1'],
     missions: [
       { id: 'buy-gear', title: '수영 준비물 사기', label: '수영 준비물\n사기', kind: 'confirm', reward: ['trunks', 'onepiece'], doneLabel: '준비물을 샀어요', doneMessage: '준비물 완료!' },
       { id: 'etiquette', title: '수영예절 읽기', label: '수영예절\n읽기', kind: 'confirm', reward: ['cap'], doneLabel: '다 읽었어요', doneMessage: '예절 완료!' },

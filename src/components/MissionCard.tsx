@@ -203,7 +203,7 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                           else if (id === 'onepiece' && !patch.suit) patch.suit = 'onepiece';
                           else if (id === 'goggles') patch.goggles = true;
                           else if (id === 'cap') patch.cap = true;
-                          else if (id === 'medal') patch.medal = true;
+                          else if (id.startsWith('medal')) patch.medal = id;
                         }
                         await setEquipped(patch);
                         setReward(null);

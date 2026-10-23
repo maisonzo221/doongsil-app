@@ -1,11 +1,11 @@
 // 미션 진행 계산 — 저장소/React와 분리한 순수 로직(단독으로 테스트할 수 있다).
-import { ItemId, MissionDef, SuitId, TIERS, TierDef } from '../data/missions';
+import { ItemId, MedalId, MissionDef, SuitId, TIERS, TierDef } from '../data/missions';
 
 export interface Equipped {
   suit: SuitId | null;
   goggles: boolean;
   cap: boolean;
-  medal: boolean;
+  medal: MedalId | null;
 }
 
 export interface BearState {

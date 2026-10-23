@@ -1,7 +1,7 @@
 // 내 둥실곰: 가진 아이템, 입고 있는 아이템, 미션 진행 상황. 기기에 저장한다.
 import { useEffect, useState } from 'react';
 import AsyncStorage from 'expo-sqlite/kv-store';
-import { ItemId, ITEMS } from '../data/missions';
+import { ItemId, ITEMS, MedalId } from '../data/missions';
 import { applyMissionComplete, BearState, CompleteResult, currentTier, Equipped } from '../utils/missionLogic';
 
 export type { BearState, CompleteResult, Equipped } from '../utils/missionLogic';
@@ -11,10 +11,18 @@ const KEY = '@doongsil/bear';
 
 const EMPTY: BearState = {
   owned: [],
-  equipped: { suit: null, goggles: false, cap: false, medal: false },
+  equipped: { suit: null, goggles: false, cap: false, medal: null },
   done: {},
   introSeen: false,
 };
+
+/** 예전 버전의 저장값(메달이 하나뿐이던 때)을 지금 형식으로 바꾼다. */
+function migrate(state: BearState): BearState {
+  const owned = state.owned.map((id) => ((id as string) === 'medal' ? 'medal1' : id)) as BearState['owned'];
+  const m = state.equipped.medal as unknown;
+  const medal = m === true || m === 'medal' ? 'medal1' : typeof m === 'string' && m.startsWith('medal') ? (m as MedalId) : null;
+  return { ...state, owned, equipped: { ...state.equipped, medal } };
+}
 
 let cache: BearState | null = null;
 const listeners = new Set<(s: BearState) => void>();
@@ -24,7 +32,7 @@ export async function getBearState(): Promise<BearState> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    cache = parsed && typeof parsed === 'object' ? { ...EMPTY, ...parsed, equipped: { ...EMPTY.equipped, ...parsed.equipped } } : EMPTY;
+    cache = parsed && typeof parsed === 'object' ? migrate({ ...EMPTY, ...parsed, equipped: { ...EMPTY.equipped, ...parsed.equipped } }) : EMPTY;
   } catch {
     cache = EMPTY;
   }
@@ -79,7 +87,7 @@ export async function setEquipped(patch: Partial<Equipped>): Promise<void> {
   if (equipped.suit && !state.owned.includes(equipped.suit)) equipped.suit = null;
   if (equipped.goggles && !state.owned.includes('goggles')) equipped.goggles = false;
   if (equipped.cap && !state.owned.includes('cap')) equipped.cap = false;
-  if (equipped.medal && !state.owned.includes('medal')) equipped.medal = false;
+  if (equipped.medal && !state.owned.includes(equipped.medal)) equipped.medal = null;
   await save({ ...state, equipped });
 }
 

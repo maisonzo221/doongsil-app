@@ -31,7 +31,7 @@ const SLOTS: Slot[] = [
   },
   { key: 'goggles', label: '수경', items: ['goggles'], selected: (e) => (e.goggles ? 'goggles' : null), patch: (id) => ({ goggles: id === 'goggles' }) },
   { key: 'cap', label: '수모', items: ['cap'], selected: (e) => (e.cap ? 'cap' : null), patch: (id) => ({ cap: id === 'cap' }) },
-  { key: 'medal', label: '메달', items: ['medal'], selected: (e) => (e.medal ? 'medal' : null), patch: (id) => ({ medal: id === 'medal' }) },
+  { key: 'medal', label: '메달', items: ['medal1', 'medal2', 'medal3', 'medal4'], selected: (e) => e.medal, patch: (id) => ({ medal: id as Equipped['medal'] }) },
 ];
 
 export default function BearCustomizeScreen() {
