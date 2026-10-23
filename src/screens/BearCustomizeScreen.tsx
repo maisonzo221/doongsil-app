@@ -43,7 +43,7 @@ export default function BearCustomizeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <LinearGradient colors={['#8EDAF0', '#3FB1DE']} style={styles.stage}>
           <BearSprite mode="idle" height={280} equipped={bear.equipped} interactive />
-          <Text style={styles.stageHint}>곰을 눌러보세요! 모두 함께 입을 수 있어요</Text>
+          <Text style={styles.stageHint}>곰을 눌러보세요!</Text>
         </LinearGradient>
 
         <Text style={styles.levelText}>
