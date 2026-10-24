@@ -314,6 +314,100 @@ export async function shareRecordToGroup(groupId: string, summary: string): Prom
   });
 }
 
+// ---- 읽음 표시 (migration_012) ----
+// 서버가 아직 이 기능을 모르는 옛 상태여도(SQL 미적용) 앱이 깨지지 않게, 실패하면 "읽음 정보 없음"으로 조용히 넘어간다.
+
+/** 이 방을 여기까지 읽었다고 서버에 알린다. */
+export async function markGroupRead(groupId: string): Promise<void> {
+  try {
+    await supabase.rpc('mark_group_read', { target_group_id: groupId });
+  } catch {
+    // 읽음 표시는 부가 기능이라 실패해도 대화에는 영향이 없다.
+  }
+}
+
+/** 방별 안 읽은 메시지 수. 안 읽은 게 없는 방은 빠져 있다. */
+export async function getUnreadCounts(): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase.rpc('get_unread_counts');
+    if (error || !data) return {};
+    const out: Record<string, number> = {};
+    for (const row of data as { group_id: string; unread: number | string }[]) {
+      const n = Number(row.unread);
+      if (n > 0) out[row.group_id] = n;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export interface MemberReadState {
+  userId: string;
+  joinedAt: string;
+  lastReadAt: string;
+}
+
+/** 멤버별로 "언제 들어왔고 어디까지 읽었는지". 말풍선 옆 안 읽은 사람 수를 계산하는 데 쓴다. */
+export async function getMemberReadStates(groupId: string): Promise<MemberReadState[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_group_members')
+      .select('user_id, joined_at, last_read_at')
+      .eq('group_id', groupId);
+    if (error || !data) return [];
+    return (data as any[])
+      .filter((r) => r.last_read_at)
+      .map((r) => ({ userId: r.user_id, joinedAt: r.joined_at, lastReadAt: r.last_read_at }));
+  } catch {
+    return [];
+  }
+}
+
+/** 이 방에서 누군가 읽은 위치가 바뀌면 알려준다. */
+export function subscribeToReadStates(groupId: string, onChange: (state: MemberReadState) => void) {
+  const channel = supabase
+    .channel(`chat_reads:${groupId}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'chat_group_members', filter: `group_id=eq.${groupId}` },
+      (payload) => {
+        const r = payload.new as any;
+        if (r?.user_id && r?.last_read_at) {
+          onChange({ userId: r.user_id, joinedAt: r.joined_at, lastReadAt: r.last_read_at });
+        }
+      }
+    )
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/** 내가 속한 어느 방이든 새 메시지가 오면 알려준다 (방 목록의 안 읽은 개수를 새로 고치는 용도). */
+export function subscribeToAnyNewMessage(onInsert: () => void) {
+  const channel = supabase
+    .channel('chat_messages:any')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, () => onInsert())
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/** 메시지 하나를 아직 안 읽은 사람 수 (카카오톡처럼). 보낸 사람과, 메시지가 올라온 뒤에 들어온 사람은 세지 않는다. */
+export function unreadReaderCount(message: ChatMessage, readers: MemberReadState[]): number {
+  const sent = Date.parse(message.createdAt);
+  if (Number.isNaN(sent)) return 0;
+  let n = 0;
+  for (const r of readers) {
+    if (r.userId === message.senderId) continue;
+    if (Date.parse(r.joinedAt) > sent) continue;
+    if (Date.parse(r.lastReadAt) < sent) n++;
+  }
+  return n;
+}
+
 export function subscribeToMessages(groupId: string, onInsert: (message: ChatMessage) => void) {
   const channel = supabase
     .channel(`chat_messages:${groupId}`)

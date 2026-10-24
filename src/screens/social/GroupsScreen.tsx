@@ -13,6 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useLeaveRoom } from '../../components/LeaveRoomFlow';
+import UnreadBubble from '../../components/UnreadBubble';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList, RoomKind } from '../../navigation/socialTypes';
@@ -23,8 +24,10 @@ import {
   getFriends,
   getGroupById,
   getGroups,
+  getUnreadCounts,
   inviteLinkFor,
   joinGroupByInviteCode,
+  subscribeToAnyNewMessage,
 } from '../../storage/social';
 import { getCurrentUser, UserProfile } from '../../storage/auth';
 
@@ -43,6 +46,7 @@ export default function GroupsScreen({ kind, navigation }: Props) {
   const label = KIND_LABEL[kind];
   const [me, setMe] = useState<UserProfile | null>(null);
   const [groups, setGroups] = useState<ChatGroup[]>([]);
+  const [unread, setUnread] = useState<Record<string, number>>({});
   const [friends, setFriends] = useState<Friend[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [joinModal, setJoinModal] = useState(false);
@@ -56,14 +60,25 @@ export default function GroupsScreen({ kind, navigation }: Props) {
   });
 
   const reload = useCallback(async () => {
-    const [user, groupList] = await Promise.all([getCurrentUser(), getGroups(kind)]);
+    const [user, groupList, unreadCounts] = await Promise.all([getCurrentUser(), getGroups(kind), getUnreadCounts()]);
     setMe(user);
     setGroups(groupList);
+    setUnread(unreadCounts);
   }, [kind]);
 
   useFocusEffect(
     useCallback(() => {
       reload();
+      // 이 목록을 보고 있는 동안 새 메시지가 오면 안 읽은 개수만 다시 가져온다(여러 개가 몰려오면 한 번에).
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const stop = subscribeToAnyNewMessage(() => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => getUnreadCounts().then(setUnread), 400);
+      });
+      return () => {
+        if (timer) clearTimeout(timer);
+        stop();
+      };
     }, [reload])
   );
 
@@ -167,9 +182,15 @@ export default function GroupsScreen({ kind, navigation }: Props) {
                     })
                   }
                 >
-                  <View style={styles.groupNameRow}>
-                    <Text style={styles.groupName}>{item.name}</Text>
-                    {item.ownerId === me?.id && <Text style={styles.ownerCrown}>👑</Text>}
+                  <View style={styles.groupTitleRow}>
+                    <View style={[styles.groupNameRow, styles.groupNameFlex]}>
+                      <Text style={styles.groupName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      {item.ownerId === me?.id && <Text style={styles.ownerCrown}>👑</Text>}
+                    </View>
+                    {/* 제목 반대편 오른쪽 끝: 안 읽은 메시지 수 (하늘색 물방울) */}
+                    <UnreadBubble count={unread[item.id] ?? 0} />
                   </View>
                   <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
                 </TouchableOpacity>
@@ -330,6 +351,8 @@ const styles = StyleSheet.create({
   },
   leaveActionText: { fontFamily: fonts.bold, color: colors.white, fontSize: 13, textAlign: 'center' },
   groupMain: { padding: spacing.sm },
+  groupTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+  groupNameFlex: { flex: 1 },
   groupNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
   groupName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
   ownerCrown: { fontSize: 13 },

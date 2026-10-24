@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -28,15 +29,20 @@ import {
   getFriends,
   getGroupById,
   getGroupMembers,
+  getMemberReadStates,
   getMessages,
   inviteLinkFor,
   inviteMemberToGroup,
   kickMember,
+  markGroupRead,
+  MemberReadState,
   ProfanityBlockedError,
   sendTextMessage,
   shareRecordToGroup,
   subscribeToMessages,
+  subscribeToReadStates,
   transferOwnership,
+  unreadReaderCount,
 } from '../../storage/social';
 import { getAllRecords } from '../../storage/records';
 import { getCurrentUser } from '../../storage/auth';
@@ -52,6 +58,9 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [myId, setMyId] = useState<string | null>(null);
   const [members, setMembers] = useState<Record<string, Friend>>({});
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // 멤버별로 어디까지 읽었는지 — 말풍선 옆 "안 읽은 사람 수" 계산용.
+  const [readers, setReaders] = useState<MemberReadState[]>([]);
+  const focused = useRef(false);
   const [draft, setDraft] = useState('');
   const [memberModal, setMemberModal] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
@@ -87,22 +96,50 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const isOwner = !!myId && myId === ownerId;
 
   const reload = useCallback(async () => {
-    const [user, memberList, messageList, group] = await Promise.all([
+    const [user, memberList, messageList, group, readStates] = await Promise.all([
       getCurrentUser(),
       getGroupMembers(groupId),
       getMessages(groupId),
       getGroupById(groupId),
+      getMemberReadStates(groupId),
     ]);
+    setReaders(readStates);
     setMyId(user?.id ?? null);
     setMembers(Object.fromEntries(memberList.map((m) => [m.id, m])));
     setMessages(messageList);
     setInviteCode(group?.inviteCode ?? null);
   }, [groupId]);
 
+  // 이 화면을 보고 있는 동안만 "읽음"으로 처리한다. 방에 들어오면 바로, 보고 있는 중에 새 메시지가 오면 곧바로 알린다.
+  const markReadSoon = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markRead = useCallback(() => {
+    if (!focused.current || AppState.currentState !== 'active') return;
+    if (markReadSoon.current) clearTimeout(markReadSoon.current);
+    markReadSoon.current = setTimeout(() => markGroupRead(groupId), 300);
+  }, [groupId]);
+
   useFocusEffect(
     useCallback(() => {
-      reload();
-    }, [reload])
+      focused.current = true;
+      reload().then(markRead);
+      // 다른 사람이 읽은 걸 바로 반영한다. 실시간이 안 되는 환경을 대비해 20초마다 한 번 더 확인한다.
+      const stopReads = subscribeToReadStates(groupId, (state) =>
+        setReaders((prev) => {
+          const others = prev.filter((r) => r.userId !== state.userId);
+          const old = prev.find((r) => r.userId === state.userId);
+          return [...others, { ...state, joinedAt: state.joinedAt || old?.joinedAt || state.lastReadAt }];
+        })
+      );
+      const poll = setInterval(() => getMemberReadStates(groupId).then((r) => r.length > 0 && setReaders(r)), 20000);
+      const appSub = AppState.addEventListener('change', (st) => st === 'active' && markRead());
+      return () => {
+        focused.current = false;
+        if (markReadSoon.current) clearTimeout(markReadSoon.current);
+        stopReads();
+        clearInterval(poll);
+        appSub.remove();
+      };
+    }, [reload, groupId, markRead])
   );
 
   useEffect(() => {
@@ -166,9 +203,11 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
         freshKeys.current.add(message.id);
         return [...prev, message];
       });
+      // 보고 있는 중에 온 메시지는 바로 읽은 것으로 친다.
+      markRead();
     });
     return unsubscribe;
-  }, [groupId]);
+  }, [groupId, markRead]);
 
   async function handleSend() {
     const text = draft.trim();
@@ -278,6 +317,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
           ref={listRef}
           style={styles.flex}
           data={messages}
+          extraData={readers}
           keyExtractor={(m) => m.localKey ?? m.id}
           contentContainerStyle={styles.list}
           keyboardDismissMode="interactive"
@@ -302,6 +342,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
                 fresh={freshKeys.current.has(rowKey)}
                 rowKey={rowKey}
                 onAnimated={handleAnimated}
+                unread={unreadReaderCount(item, readers)}
               />
             );
           }}

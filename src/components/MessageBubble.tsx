@@ -21,6 +21,8 @@ interface Props {
   fresh: boolean;
   rowKey: string;
   onAnimated: (rowKey: string) => void;
+  /** 이 메시지를 아직 안 읽은 사람 수 (카카오톡처럼 말풍선 옆에 숫자로). 0이면 표시하지 않는다. */
+  unread?: number;
 }
 
 // 말풍선 "밖"(바로 아래)에서 피어나는 작은 공기방울. 말풍선 위로 올라가 겹치지 않고, 아래에서 살짝 떠오르다 사라진다.
@@ -72,7 +74,7 @@ function BubbleDots({ mine }: { mine: boolean }) {
   );
 }
 
-function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated }: Props) {
+function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated, unread = 0 }: Props) {
   const animate = fresh && !reduceMotion;
   const rise = useRef(new Animated.Value(animate ? 0 : 1)).current;
   const wobble = useRef(new Animated.Value(0)).current;
@@ -117,28 +119,32 @@ function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated }: 
   return (
     <View style={[styles.bubbleRow, mine && styles.bubbleRowMine]}>
       {!mine && <Text style={styles.sender}>{nickname}</Text>}
-      <View style={styles.bubbleOuter}>
-        <Animated.View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther, bubbleStyle as object]}>
-          {/* 비눗방울처럼 투명한 유리 느낌: 반투명 색 + 무지개빛 번짐 + 윗쪽 반사광 */}
-          <LinearGradient
-            colors={mine ? GLASS_MINE : GLASS_OTHER}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient colors={SHEEN} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-          <View pointerEvents="none" style={styles.shine} />
-          <View pointerEvents="none" style={styles.glint} />
-          <View pointerEvents="none" style={styles.rimLight} />
-          {item.type === 'text' && <Text style={text}>{item.text}</Text>}
-          {item.type === 'record_share' && (
-            <View>
-              <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>🏊 수영 기록 공유</Text>
-              <Text style={text}>{item.sharedSummary}</Text>
-            </View>
-          )}
-        </Animated.View>
-        {dots && <BubbleDots mine={mine} />}
+      <View style={[styles.line, mine ? styles.lineMine : styles.lineOther]}>
+        {mine && unread > 0 && <Text style={[styles.unread, styles.unreadMine]}>{unread}</Text>}
+        <View style={styles.bubbleOuter}>
+          <Animated.View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther, bubbleStyle as object]}>
+            {/* 비눗방울처럼 투명한 유리 느낌: 반투명 색 + 무지개빛 번짐 + 윗쪽 반사광 */}
+            <LinearGradient
+              colors={mine ? GLASS_MINE : GLASS_OTHER}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient colors={SHEEN} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            <View pointerEvents="none" style={styles.shine} />
+            <View pointerEvents="none" style={styles.glint} />
+            <View pointerEvents="none" style={styles.rimLight} />
+            {item.type === 'text' && <Text style={text}>{item.text}</Text>}
+            {item.type === 'record_share' && (
+              <View>
+                <Text style={[styles.shareLabel, mine && styles.bubbleTextMine]}>🏊 수영 기록 공유</Text>
+                <Text style={text}>{item.sharedSummary}</Text>
+              </View>
+            )}
+          </Animated.View>
+          {dots && <BubbleDots mine={mine} />}
+        </View>
+        {!mine && unread > 0 && <Text style={[styles.unread, styles.unreadOther]}>{unread}</Text>}
       </View>
     </View>
   );
@@ -156,7 +162,14 @@ const styles = StyleSheet.create({
   bubbleRow: { marginBottom: spacing.hairline, alignItems: 'flex-start' },
   bubbleRowMine: { alignItems: 'flex-end' },
   sender: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 11, marginBottom: 2 },
-  bubbleOuter: { maxWidth: '78%' },
+  bubbleOuter: { maxWidth: '78%', flexShrink: 1 },
+  // 말풍선 + 안 읽은 사람 수. 내 메시지는 숫자가 왼쪽, 상대 메시지는 오른쪽(카카오톡과 같다).
+  line: { flexDirection: 'row', alignItems: 'flex-end', maxWidth: '100%' },
+  lineMine: { alignSelf: 'flex-end' },
+  lineOther: { alignSelf: 'flex-start' },
+  unread: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 11, marginBottom: 3 },
+  unreadMine: { marginRight: 5 },
+  unreadOther: { marginLeft: 5 },
   // 안쪽 여백은 예전(가로 8, 세로 6)보다 2씩 늘렸다.
   bubble: {
     borderRadius: 20,

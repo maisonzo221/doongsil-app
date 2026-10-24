@@ -273,6 +273,8 @@ export default function WaterTabBar({
               accessibilityState={focused ? { selected: true } : {}}
               accessibilityLabel={LABELS[route.name] ?? route.name}
               style={styles.tab}
+              // 아이콘이 위로 올라간 만큼, 올라간 부분도 눌리게 터치 영역을 위쪽으로 넓힌다.
+              hitSlop={isCenter ? { top: 28 } : undefined}
             >
               <View style={[styles.iconWrap, isCenter && styles.iconWrapCenter]}>
                 {isAlert && <Animated.View style={[styles.alertGlow, { opacity: pulse }]} />}
@@ -292,7 +294,8 @@ const styles = StyleSheet.create({
   row: { position: 'absolute', left: 0, right: 0, flexDirection: 'row' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   iconWrap: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  iconWrapCenter: { marginTop: -8 },
+  // 가운데(캘린더) 메뉴는 솟아오른 물결 안쪽에 오도록 다른 메뉴보다 훨씬 위에 둔다.
+  iconWrapCenter: { marginTop: -28 },
   alertGlow: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.alert },
   alertDot: { position: 'absolute', top: 2, right: 2, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.alert, borderWidth: 1.5, borderColor: colors.white },
 });
