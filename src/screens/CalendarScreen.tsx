@@ -15,6 +15,7 @@ import { NotingIcon } from '../components/icons/TabIcons';
 import { SwimRecord } from '../types';
 import { colors, fonts, radius, spacing } from '../theme';
 import { getAllRecords } from '../storage/records';
+import { swimStatsFrom } from '../storage/bear';
 import { markIntroSeen, useBearState } from '../storage/bear';
 import { pushMyStats } from '../storage/profileStats';
 import {
@@ -101,6 +102,7 @@ export default function CalendarScreen({ navigation }: Props) {
   const summary = useMemo(() => monthlySummary(monthRecords), [monthRecords]);
   const distanceLabel = useMemo(() => totalDistanceLabel(records), [records]);
   const recentRecords = useMemo(() => records.slice(0, RECENT_COUNT), [records]);
+  const swimStats = useMemo(() => swimStatsFrom(records), [records]);
 
   // 처음 들어왔을 때 한 번만 내 둥실곰을 소개한다.
   useEffect(() => {
@@ -150,7 +152,7 @@ export default function CalendarScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <MissionCard
-          recordCount={records.length}
+          stats={swimStats}
           onAddRecord={() => navigation.navigate('RecordForm')}
           onOpenCustomize={() => navigation.navigate('BearCustomize')}
         />

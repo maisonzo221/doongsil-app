@@ -39,6 +39,7 @@ import {
 import { getCurrentUser, UserProfile } from '../../storage/auth';
 import { looksLikeAdminPlace, PlaceInfo } from '../../services/geo';
 import { geocodePlace, reversePlace } from '../../services/placeSearch';
+import { matchesAllWords } from '../../utils/koreanSearch';
 import { POOL_ENROLLMENTS } from '../../data/poolEnrollment';
 import { FavoritePool, toggleFavoritePool } from '../../storage/favoritePools';
 import {
@@ -205,7 +206,7 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
         if (cancelled) return;
         // 주소에만 글자가 겹친 건(예: "고양"이 고양시 수영장 전부의 주소에 있음) 이름 검색으로 안 친다.
         const words = q.split(/\s+/);
-        if (byName.some((p) => !p.nearbyMatch && words.every((w) => p.name.includes(w)))) {
+        if (byName.some((p) => !p.nearbyMatch && matchesAllWords(p.name, words))) {
           showByName(byName, null);
           return;
         }

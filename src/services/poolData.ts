@@ -13,6 +13,7 @@ import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
 import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
 import { POOL_EXCLUDED_KEYS } from '../data/poolEnrollment';
 import { poolKey } from '../utils/poolKey';
+import { matchesAllWords } from '../utils/koreanSearch';
 import { dedupeAgainst, isInKorea, PlaceInfo, rankNearby } from './geo';
 
 const API_KEY = process.env.EXPO_PUBLIC_POOL_DATA_API_KEY;
@@ -135,7 +136,7 @@ function mapPublicFacility(f: (typeof PUBLIC_POOL_FACILITIES)[number]): Official
 function searchPublicFacilities(tokens: string[]): OfficialPool[] {
   return PUBLIC_POOL_FACILITIES.filter((f) => {
     const haystack = `${f.name} ${f.roadAddress} ${f.lotAddress}`;
-    return tokens.every((t) => haystack.includes(t));
+    return matchesAllWords(haystack, tokens);
   })
     .map(mapPublicFacility)
     .filter(isVisible);
@@ -167,7 +168,7 @@ function mapSeoulFacility(f: (typeof SEOUL_POOL_FACILITIES)[number]): OfficialPo
 function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
   return SEOUL_POOL_FACILITIES.filter((f) => {
     const haystack = `${f.name} ${f.district ?? ''} ${f.roadAddress}`;
-    return tokens.every((t) => haystack.includes(t));
+    return matchesAllWords(haystack, tokens);
   })
     .map(mapSeoulFacility)
     .filter(isVisible);
@@ -214,7 +215,7 @@ function allPools(): OfficialPool[] {
 function searchLicensed(tokens: string[]): OfficialPool[] {
   return LICENSED_POOL_FACILITIES.filter((r) => {
     const haystack = `${r[1]} ${r[2]} ${r[3]}`;
-    return tokens.every((t) => haystack.includes(t));
+    return matchesAllWords(haystack, tokens);
   })
     .map(mapLicensed)
     .filter(isVisible);
@@ -244,7 +245,7 @@ async function fetchByCondition(
 
 function matchesAllTokens(pool: OfficialPool, tokens: string[]): boolean {
   const haystack = `${pool.name} ${pool.roadAddress} ${pool.lotAddress}`;
-  return tokens.every((t) => haystack.includes(t));
+  return matchesAllWords(haystack, tokens);
 }
 
 const NEARBY_RADIUS_KM = 3;
@@ -333,7 +334,8 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
     const byId = new Map<string, OfficialPool>();
     [...byName, ...byRoadAddress, ...byLotAddress].forEach((p) => byId.set(p.id, p));
     const businessResults = Array.from(byId.values());
-    const filtered = tokens.length > 1 ? businessResults.filter((p) => matchesAllTokens(p, tokens)) : businessResults;
+    // 서버는 글자 조각으로 찾아서 "내수"에 "실내수영장"까지 딸려 오므로, 한 단어여도 단어 단위로 다시 거른다.
+    const filtered = businessResults.filter((p) => matchesAllTokens(p, tokens));
     return withNearby([...publicResults, ...filtered]).filter(hasUsefulInfo);
   } catch {
     return withNearby(publicResults).filter(hasUsefulInfo);

@@ -3,13 +3,13 @@ import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text
 import BearStamp from './BearStamp';
 import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
 import { ITEM_IMAGES } from '../data/itemImages';
-import { completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
-import type { CompleteResult } from '../storage/bear';
+import { autoValue, completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
+import type { CompleteResult, SwimStats } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
 
 interface Props {
-  /** 지금까지 남긴 수영 기록 개수 — "첫 수영하기"를 자동으로 확인하는 데 쓴다. */
-  recordCount: number;
+  /** 지금까지 남긴 수영 기록에서 뽑은 값(횟수·누적 거리·영법) — 기록으로 확인되는 미션을 자동으로 완료하는 데 쓴다. */
+  stats: SwimStats;
   onAddRecord: () => void;
   onOpenCustomize: () => void;
 }
@@ -64,7 +64,7 @@ function StampSlot({ done, isNext }: { done: boolean; isNext: boolean }) {
   );
 }
 
-export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize }: Props) {
+export default function MissionCard({ stats, onAddRecord, onOpenCustomize }: Props) {
   const bear = useBearState();
   const progress = currentTier(bear);
   const level = levelOf(bear);
@@ -76,11 +76,11 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
   const [reward, setReward] = useState<CompleteResult | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // 기록이 생기면 "첫 수영하기"를 (순서가 되었을 때) 자동으로 완료한다.
+  // 기록이 쌓이면 기록으로 확인되는 미션(첫 수영·횟수·거리·영법)을 (순서가 되었을 때) 자동으로 완료한다.
   useEffect(() => {
-    if (recordCount <= 0) return;
-    syncAutoMissions(recordCount).then((r) => r && setReward(r));
-  }, [recordCount, bear.done]);
+    if (stats.count <= 0) return;
+    syncAutoMissions(stats).then((r) => r && setReward(r));
+  }, [stats, bear.done]);
 
   async function handleComplete(m: MissionDef) {
     if (busy) return;
@@ -99,7 +99,7 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
 
   const hint = progress
     ? `다음 미션: ${tier.missions[nextIndex].title} · 글씨를 눌러보세요`
-    : `${tier.name} 미션을 모두 마쳤어요! 다음 단계 미션이 곧 열려요`;
+    : `모든 단계를 마쳤어요! ${tier.name} 둥실곰이 되었어요 🎉`;
 
   return (
     <View style={styles.card}>
@@ -156,6 +156,7 @@ export default function MissionCard({ recordCount, onAddRecord, onOpenCustomize 
                 mission={detail}
                 done={!!bear.done[detail.id]}
                 isNext={progress != null && tier.missions[nextIndex].id === detail.id}
+                stats={stats}
                 busy={busy}
                 onComplete={() => handleComplete(detail)}
                 onClose={() => setDetail(null)}
@@ -227,6 +228,7 @@ function MissionDetail({
   mission,
   done,
   isNext,
+  stats,
   busy,
   onComplete,
   onClose,
@@ -235,6 +237,7 @@ function MissionDetail({
   mission: MissionDef;
   done: boolean;
   isNext: boolean;
+  stats: SwimStats;
   busy: boolean;
   onComplete: () => void;
   onClose: () => void;
@@ -280,6 +283,13 @@ function MissionDetail({
         {mission.id === 'kickboard' && (
           <Text style={styles.detailLead}>킥판을 잡고 물장구(발차기)를 해보았다면 눌러주세요. 처음이라 어색해도 괜찮아요!</Text>
         )}
+        {mission.desc && <Text style={styles.detailLead}>{mission.desc}</Text>}
+        {mission.auto && (
+          <Text style={styles.progressLine}>
+            지금까지 {Math.min(autoValue(mission.auto, stats), mission.auto.target).toLocaleString()} / {mission.auto.target.toLocaleString()}
+            {mission.auto.unit}
+          </Text>
+        )}
         {reward ? <Text style={styles.rewardLine}>보상: {reward}</Text> : null}
       </ScrollView>
 
@@ -287,7 +297,7 @@ function MissionDetail({
         <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
           <Text style={styles.secondaryBtnText}>닫기</Text>
         </TouchableOpacity>
-        {!done && mission.kind === 'auto-first-swim' && (
+        {!done && (mission.kind === 'auto-first-swim' || mission.kind === 'auto-stats') && (
           <TouchableOpacity style={styles.primaryBtn} onPress={onAddRecord}>
             <Text style={styles.primaryBtnText}>수영 기록하러 가기</Text>
           </TouchableOpacity>
@@ -342,6 +352,7 @@ const styles = StyleSheet.create({
   detailBody: { marginVertical: spacing.xs },
   detailLead: { fontFamily: fonts.regular, color: colors.text, fontSize: 14, lineHeight: 21, marginBottom: spacing.xs },
   bullet: { fontFamily: fonts.medium, color: colors.text, fontSize: 14, lineHeight: 22, marginBottom: 4 },
+  progressLine: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 14, marginVertical: spacing.xs },
   rewardLine: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 13, marginTop: spacing.xs },
   rewardButtons: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
   rewardButtonsCol: { flexDirection: 'column-reverse', alignSelf: 'stretch', gap: spacing.xs, marginTop: spacing.xs },

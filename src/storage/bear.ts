@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import AsyncStorage from 'expo-sqlite/kv-store';
 import { ItemId, ITEMS, MedalId } from '../data/missions';
-import { applyMissionComplete, BearState, CompleteResult, currentTier, Equipped } from '../utils/missionLogic';
+import { applyMissionComplete, BearState, CompleteResult, currentTier, Equipped, isAutoSatisfied, SwimStats } from '../utils/missionLogic';
 
-export type { BearState, CompleteResult, Equipped } from '../utils/missionLogic';
+export type { BearState, CompleteResult, Equipped, SwimStats } from '../utils/missionLogic';
+export { EMPTY_STATS, swimStatsFrom, autoValue } from '../utils/missionLogic';
 export { currentTier, levelOf } from '../utils/missionLogic';
 
 const KEY = '@doongsil/bear';
@@ -70,14 +71,29 @@ export async function completeMission(missionId: string): Promise<CompleteResult
   return result;
 }
 
-/** 기록(첫 수영)처럼 앱이 스스로 확인할 수 있는 미션을, 순서가 되었으면 자동으로 완료한다. */
-export async function syncAutoMissions(recordCount: number): Promise<CompleteResult | null> {
-  const state = await getBearState();
-  const cur = currentTier(state);
-  if (!cur) return null;
-  const next = cur.tier.missions[cur.nextIndex];
-  if (next.kind === 'auto-first-swim' && recordCount > 0) return completeMission(next.id);
-  return null;
+/** 기록(첫 수영·횟수·거리·영법)으로 확인되는 미션을, 순서가 되었으면 자동으로 완료한다.
+ * 기록이 이미 충분해서 여러 개가 한꺼번에 달성되면, 막히는 미션(눌러서 하는 것)까지 이어서 모두 완료하고
+ * 보상 창은 한 번만 보여주도록 결과를 하나로 합쳐서 돌려준다. */
+export async function syncAutoMissions(stats: SwimStats): Promise<CompleteResult | null> {
+  let merged: CompleteResult | null = null;
+  for (let guard = 0; guard < 40; guard++) {
+    const state = await getBearState();
+    const cur = currentTier(state);
+    if (!cur) break;
+    const next = cur.tier.missions[cur.nextIndex];
+    if (!isAutoSatisfied(next, stats)) break;
+    const r = await completeMission(next.id);
+    if (!r) break;
+    merged = merged
+      ? {
+          state: r.state,
+          mission: r.mission,
+          gained: [...merged.gained, ...r.gained.filter((g) => !merged!.gained.includes(g))],
+          tierCompleted: r.tierCompleted ?? merged.tierCompleted,
+        }
+      : r;
+  }
+  return merged;
 }
 
 export async function setEquipped(patch: Partial<Equipped>): Promise<void> {

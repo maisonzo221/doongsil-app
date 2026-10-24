@@ -1,5 +1,5 @@
 // 미션 진행 계산 — 저장소/React와 분리한 순수 로직(단독으로 테스트할 수 있다).
-import { ItemId, MedalId, MissionDef, SuitId, TIERS, TierDef } from '../data/missions';
+import { AutoRule, ItemId, MedalId, MissionDef, SuitId, TIERS, TierDef } from '../data/missions';
 
 export interface Equipped {
   suit: SuitId | null;
@@ -73,3 +73,37 @@ export function applyMissionComplete(state: BearState, missionId: string, now = 
   };
 }
 
+
+/** 수영 기록에서 뽑은, 자동 미션이 보는 값들. */
+export interface SwimStats {
+  count: number;
+  totalMeters: number;
+  maxMeters: number;
+  strokes: number;
+}
+
+export const EMPTY_STATS: SwimStats = { count: 0, totalMeters: 0, maxMeters: 0, strokes: 0 };
+
+export function swimStatsFrom(records: { distanceMeters?: number; strokes?: string[] }[]): SwimStats {
+  const kinds = new Set<string>();
+  let totalMeters = 0;
+  let maxMeters = 0;
+  for (const r of records) {
+    const m = r.distanceMeters ?? 0;
+    totalMeters += m;
+    if (m > maxMeters) maxMeters = m;
+    (r.strokes ?? []).forEach((s) => kinds.add(s));
+  }
+  return { count: records.length, totalMeters, maxMeters, strokes: kinds.size };
+}
+
+export function autoValue(rule: AutoRule, stats: SwimStats): number {
+  return rule.metric === 'count' ? stats.count : rule.metric === 'totalMeters' ? stats.totalMeters : rule.metric === 'maxMeters' ? stats.maxMeters : stats.strokes;
+}
+
+/** 이 미션이 기록만으로 이미 달성됐는지. 눌러서 하는 미션은 항상 false. */
+export function isAutoSatisfied(mission: MissionDef, stats: SwimStats): boolean {
+  if (mission.kind === 'auto-first-swim') return stats.count > 0;
+  if (mission.kind === 'auto-stats' && mission.auto) return autoValue(mission.auto, stats) >= mission.auto.target;
+  return false;
+}
