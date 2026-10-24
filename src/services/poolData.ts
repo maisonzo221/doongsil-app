@@ -45,6 +45,8 @@ export interface OfficialPool {
   applyMethod?: string;
   homepageUrl?: string;
   photoUrl?: string;
+  /** 좌표가 길/동네 단위 근사값이면 true — 지도 핀을 찍지 않고 주소로 길찾기를 연다. */
+  coordApprox?: boolean;
   source?: 'business' | 'public' | 'seoul';
   // 아래는 SEOUL_POOL_FACILITIES 쪽에만 채워진다 — 서울 열린데이터광장 데이터엔 좌표가
   // 없어서 지도 핀으로는 못 뜨지만, 레일 수(자유 텍스트)와 자유수영 안내는 실제로 들어있다.
@@ -116,6 +118,7 @@ function mapPublicFacility(f: (typeof PUBLIC_POOL_FACILITIES)[number]): Official
     statusName: f.statusName,
     lat: f.lat,
     lng: f.lng,
+    coordApprox: f.coordApprox || undefined,
     operWeekday: f.operWeekday ?? undefined,
     operWeekend: f.operWeekend ?? undefined,
     closedDay: f.closedDay ?? undefined,
@@ -467,7 +470,7 @@ export function getPoolsByKeys(keys: string[]): Map<string, OfficialPool> {
  * 좌표가 없는 시설(서울 열린데이터광장 쪽엔 좌표 필드가 없음)은 좌표 대신 실제 주소로
  * 검색하는 링크로 대신한다 — 좌표를 지어내지 않고, 있는 그대로의 주소 데이터만 쓴다. */
 export function mapLinkFor(pool: OfficialPool): string | undefined {
-  if (pool.lat != null && pool.lng != null) {
+  if (pool.lat != null && pool.lng != null && !pool.coordApprox) {
     return `https://map.kakao.com/link/map/${encodeURIComponent(pool.name)},${pool.lat},${pool.lng}`;
   }
   if (pool.roadAddress) {

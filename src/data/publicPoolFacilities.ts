@@ -22,6 +22,8 @@ export interface PublicPoolFacility {
   statusName: string;
   lat: number;
   lng: number;
+  /** true면 좌표가 길/동네 단위 근사값이다. 지도 핀과 좌표 길찾기를 쓰지 않는다. */
+  coordApprox?: boolean;
   operWeekday: string | null;
   operWeekend: string | null;
   closedDay: string | null;

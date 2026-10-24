@@ -186,7 +186,7 @@ export default function PoolMapView({
   const points = useMemo(
     () =>
       pools
-        .filter((p) => p.lat != null && p.lng != null)
+        .filter((p) => p.lat != null && p.lng != null && !p.coordApprox)
         .map((p) => ({ id: p.id, name: p.name, addr: p.roadAddress, lat: p.lat as number, lng: p.lng as number })),
     [pools]
   );
