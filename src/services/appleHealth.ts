@@ -11,7 +11,7 @@ import {
 } from '@kingstinct/react-native-healthkit';
 import { Stroke } from '../types';
 import { computePaceSecPer100m, estimateSwolf } from '../utils/pace';
-import { addRecord, getAllRecords } from '../storage/records';
+import { addRecord, getAllRecords, updateRecord } from '../storage/records';
 
 export interface HealthImportResult {
   distanceMeters: number;
@@ -74,7 +74,77 @@ function minutesFromDuration(q?: Quantity): number | undefined {
   }
 }
 
-/** 오늘 애플 피트니스에 기록된 수영 운동을 불러온다. 없으면 null. */
+// 애플워치 수영 운동은 구간(랩)마다 영법(자유형/배영/평영/접영)이 같이 기록된다. 그걸 읽어서 둥실의 영법 값으로 바꾼다.
+// 영법 정보가 없는 운동(예: 수동으로 넣은 기록)은 지금까지처럼 자유형으로 둔다.
+const STROKE_FROM_STYLE: Record<number, Stroke> = { 2: 'freestyle', 3: 'backstroke', 4: 'breaststroke', 5: 'butterfly' };
+
+function strokesOf(workouts: readonly any[]): Stroke[] {
+  const found = new Set<Stroke>();
+  for (const w of workouts) {
+    try {
+      for (const ev of w.events ?? []) {
+        const raw = ev?.metadata?.HKSwimmingStrokeStyle;
+        const style = typeof raw === 'number' ? raw : Number(raw);
+        const stroke = STROKE_FROM_STYLE[style];
+        if (stroke) found.add(stroke);
+      }
+    } catch {
+      // 이 운동에선 영법을 못 읽어도 다른 값은 그대로 쓴다.
+    }
+  }
+  return found.size > 0 ? Array.from(found) : ['freestyle'];
+}
+
+/** 같은 날의 수영 운동들을 하루치 기록 하나로 합친다. (하루에 두 번 수영해도 거리가 빠지지 않게) */
+async function summarizeWorkouts(workouts: readonly any[]): Promise<HealthImportResult> {
+  let distance = 0;
+  let minutes = 0;
+  let calories = 0;
+  let strokeCount = 0;
+  let hrSum = 0;
+  let hrN = 0;
+  for (const workout of workouts) {
+    distance += metersFromDistance(workout.totalDistance) ?? 0;
+    minutes += minutesFromDuration(workout.duration) ?? 0;
+    calories += workout.totalEnergyBurned?.quantity ?? 0;
+    try {
+      const stats = await queryStatisticsForQuantity('HKQuantityTypeIdentifierHeartRate', ['discreteAverage'], {
+        filter: { workout },
+        unit: 'count/min',
+      });
+      if (stats.averageQuantity) {
+        hrSum += stats.averageQuantity.quantity;
+        hrN++;
+      }
+    } catch {
+      // 심박수를 못 읽어도 기록은 만든다.
+    }
+    try {
+      const stats = await queryStatisticsForQuantity('HKQuantityTypeIdentifierSwimmingStrokeCount', ['cumulativeSum'], {
+        filter: { workout },
+        unit: 'count',
+      });
+      if (stats.sumQuantity) strokeCount += stats.sumQuantity.quantity;
+    } catch {
+      // 스트로크 수를 못 읽어도 기록은 만든다.
+    }
+  }
+  const distanceMeters = Math.round(distance);
+  const durationMinutes = Math.round(minutes);
+  const strokes = Math.round(strokeCount);
+  return {
+    distanceMeters,
+    durationMinutes,
+    calories: Math.round(calories),
+    avgHeartRate: hrN > 0 ? Math.round(hrSum / hrN) : 0,
+    avgPaceSecPer100m: computePaceSecPer100m(distanceMeters, durationMinutes),
+    swolf: estimateSwolf(distanceMeters, durationMinutes, strokes),
+    strokeCount: strokes || undefined,
+    strokes: strokesOf(workouts),
+  };
+}
+
+/** 그날 애플 피트니스에 기록된 수영 운동(하루에 여러 번이면 합쳐서)을 불러온다. 없으면 null. */
 export async function getTodaySwimWorkout(dateString: string): Promise<HealthImportResult | null> {
   if (Platform.OS !== 'ios') return null;
 
@@ -89,54 +159,12 @@ export async function getTodaySwimWorkout(dateString: string): Promise<HealthImp
   const endDate = new Date(y, m - 1, d, 23, 59, 59);
 
   const workouts = await queryWorkoutSamples({
-    filter: {
-      workoutActivityType: WorkoutActivityType.swimming,
-      date: { startDate, endDate },
-    },
-    limit: 1,
-    ascending: false,
+    filter: { workoutActivityType: WorkoutActivityType.swimming, date: { startDate, endDate } },
+    limit: 0,
+    ascending: true,
   });
-
-  const workout = workouts[0];
-  if (!workout) return null;
-
-  let avgHeartRate = 0;
-  try {
-    const stats = await queryStatisticsForQuantity(
-      'HKQuantityTypeIdentifierHeartRate',
-      ['discreteAverage'],
-      { filter: { workout }, unit: 'count/min' }
-    );
-    avgHeartRate = stats.averageQuantity ? Math.round(stats.averageQuantity.quantity) : 0;
-  } catch {
-    avgHeartRate = 0;
-  }
-
-  let strokeCount = 0;
-  try {
-    const stats = await queryStatisticsForQuantity(
-      'HKQuantityTypeIdentifierSwimmingStrokeCount',
-      ['cumulativeSum'],
-      { filter: { workout }, unit: 'count' }
-    );
-    strokeCount = stats.sumQuantity ? Math.round(stats.sumQuantity.quantity) : 0;
-  } catch {
-    strokeCount = 0;
-  }
-
-  const distanceMeters = Math.round(metersFromDistance(workout.totalDistance) ?? 0);
-  const durationMinutes = minutesFromDuration(workout.duration) ?? 0;
-
-  return {
-    distanceMeters,
-    durationMinutes,
-    calories: Math.round(workout.totalEnergyBurned?.quantity ?? 0),
-    avgHeartRate,
-    avgPaceSecPer100m: computePaceSecPer100m(distanceMeters, durationMinutes),
-    swolf: estimateSwolf(distanceMeters, durationMinutes, strokeCount),
-    strokeCount: strokeCount || undefined,
-    strokes: ['freestyle'],
-  };
+  if (workouts.length === 0) return null;
+  return summarizeWorkouts(workouts);
 }
 
 function dateToLocalString(d: Date): string {
@@ -146,55 +174,63 @@ function dateToLocalString(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-const HISTORY_IMPORTED_KEY = '@doongsil/health/historyImported';
+const LAST_SYNC_KEY = '@doongsil/health/lastSwimSync';
+// 워치가 늦게 동기화되거나 같은 날 운동이 더 추가될 수 있어서, 다시 훑을 때 며칠 전부터 본다.
+const RESCAN_DAYS = 3;
 
-/** 건강 데이터 권한을 처음 허용했을 때 딱 한 번, 애플 건강에 있는 과거 수영 운동 기록을
- * 전부 훑어서 아직 둥실에 없는 날짜만 자동으로 기록을 만들어준다. 이미 한 번 돌았으면
- * (권한을 거부했을 때도) AsyncStorage 플래그를 보고 바로 빠져나가서, 앱을 열 때마다
- * 다시 스캔하지 않는다. */
-export async function importHealthHistoryOnce(): Promise<void> {
+/** 애플워치(건강 앱)의 수영 운동을 둥실 기록으로 가져온다. 캘린더를 열 때마다 불러서,
+ * 워치로 방금 한 수영도 기록·미션(횟수·누적 거리·영법)에 바로 반영된다.
+ *  · 처음에는 지금까지의 수영 운동 전체를, 그다음부터는 마지막으로 확인한 날의 며칠 전부터 훑는다.
+ *  · 그날 직접 쓴 기록이 이미 있으면 그대로 두고(덮어쓰지 않음), 건강 앱에서 가져온 기록은 새 값으로 갱신한다.
+ * 건강 데이터를 쓸 수 없는 환경(Android·권한 없음)이면 아무것도 하지 않는다. */
+export async function syncHealthSwims(): Promise<void> {
   if (Platform.OS !== 'ios') return;
-  const already = await AsyncStorage.getItem(HISTORY_IMPORTED_KEY);
-  if (already) return;
+  const available = await isHealthAvailable();
+  if (!available) return;
+  const granted = await requestHealthAuthorization();
+  if (!granted) return;
 
-  try {
-    const available = await isHealthAvailable();
-    if (!available) return;
-    const granted = await requestHealthAuthorization();
-    if (!granted) return;
+  const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
+  const from = lastSync ? new Date(new Date(lastSync).getTime() - RESCAN_DAYS * 24 * 60 * 60 * 1000) : null;
+  const workouts = await queryWorkoutSamples({
+    filter: from
+      ? { workoutActivityType: WorkoutActivityType.swimming, date: { startDate: from } }
+      : { workoutActivityType: WorkoutActivityType.swimming },
+    limit: 0,
+    ascending: true,
+  });
 
-    const workouts = await queryWorkoutSamples({
-      filter: { workoutActivityType: WorkoutActivityType.swimming },
-      limit: 0,
-      ascending: true,
-    });
-    if (workouts.length === 0) return;
-
-    const dates = Array.from(new Set(workouts.map((w) => dateToLocalString(w.startDate))));
-    const existingDates = new Set((await getAllRecords()).map((r) => r.date));
-
-    for (const dateString of dates) {
-      if (existingDates.has(dateString)) continue;
-      const imported = await getTodaySwimWorkout(dateString);
-      if (!imported) continue;
-      await addRecord({
-        sport: 'swim',
-        date: dateString,
-        mood: 'good',
-        strokes: imported.strokes,
-        distanceMeters: imported.distanceMeters,
-        durationMinutes: imported.durationMinutes,
-        calories: imported.calories,
-        avgHeartRate: imported.avgHeartRate,
-        avgPaceSecPer100m: imported.avgPaceSecPer100m,
-        swolf: imported.swolf,
-        strokeCount: imported.strokeCount,
-        source: 'health',
-      });
+  if (workouts.length > 0) {
+    const byDate = new Map<string, any[]>();
+    for (const w of workouts) {
+      const key = dateToLocalString(w.startDate);
+      byDate.set(key, [...(byDate.get(key) ?? []), w]);
     }
-  } finally {
-    await AsyncStorage.setItem(HISTORY_IMPORTED_KEY, '1');
+    const existing = new Map((await getAllRecords()).map((r) => [r.date, r]));
+    for (const [dateString, dayWorkouts] of byDate) {
+      const prev = existing.get(dateString);
+      if (prev && prev.source !== 'health') continue; // 직접 쓴 기록은 건드리지 않는다
+      const summary = await summarizeWorkouts(dayWorkouts);
+      const fields = {
+        sport: 'swim' as const,
+        date: dateString,
+        mood: prev?.mood ?? ('good' as const),
+        strokes: summary.strokes,
+        distanceMeters: summary.distanceMeters,
+        durationMinutes: summary.durationMinutes,
+        calories: summary.calories,
+        avgHeartRate: summary.avgHeartRate,
+        avgPaceSecPer100m: summary.avgPaceSecPer100m,
+        swolf: summary.swolf,
+        strokeCount: summary.strokeCount,
+        memo: prev?.memo,
+        source: 'health' as const,
+      };
+      if (prev) await updateRecord(prev.id, fields);
+      else await addRecord(fields);
+    }
   }
+  await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
 }
 
 async function fetchDayActivity(dateString: string): Promise<TodayActivitySummary> {

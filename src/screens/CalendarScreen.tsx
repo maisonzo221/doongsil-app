@@ -21,7 +21,7 @@ import { pushMyStats } from '../storage/profileStats';
 import {
   getMonthActivitySummaries,
   getTodayActivitySummary,
-  importHealthHistoryOnce,
+  syncHealthSwims,
   TodayActivitySummary,
 } from '../services/appleHealth';
 import { computeStreak } from '../utils/streak';
@@ -63,9 +63,9 @@ export default function CalendarScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      // 건강 데이터 권한을 처음 허용한 경우에만 실제로 뭔가 하고, 그 다음부턴 바로
-      // 빠져나간다 — 과거 수영 기록을 다 가져온 뒤에 기록 목록을 새로고침한다.
-      importHealthHistoryOnce().finally(() => {
+      // 캘린더를 열 때마다 애플워치(건강 앱)의 새 수영 운동을 기록으로 가져온 뒤 기록 목록을 새로고침한다.
+      // 그러면 워치로 한 수영도 미션(횟수·누적 거리·영법)에 바로 반영된다.
+      syncHealthSwims().catch(() => {}).finally(() => {
         getAllRecords().then(setRecords);
         // 수친이 내 프로필에서 최신 평균 수영 데이터를 볼 수 있게, 캘린더를 열 때마다
         // 로컬 기록 기준으로 다시 계산해서 서버에 올려둔다.

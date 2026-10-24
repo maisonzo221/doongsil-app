@@ -290,6 +290,7 @@ function MissionDetail({
             {mission.auto.unit}
           </Text>
         )}
+        {mission.auto && <Text style={styles.sourceNote}>애플워치로 한 수영과, 오늘의 수영에 직접 남긴 기록이 모두 반영돼요.</Text>}
         {reward ? <Text style={styles.rewardLine}>보상: {reward}</Text> : null}
       </ScrollView>
 
@@ -353,6 +354,7 @@ const styles = StyleSheet.create({
   detailLead: { fontFamily: fonts.regular, color: colors.text, fontSize: 14, lineHeight: 21, marginBottom: spacing.xs },
   bullet: { fontFamily: fonts.medium, color: colors.text, fontSize: 14, lineHeight: 22, marginBottom: 4 },
   progressLine: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 14, marginVertical: spacing.xs },
+  sourceNote: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginBottom: spacing.xs },
   rewardLine: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 13, marginTop: spacing.xs },
   rewardButtons: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
   rewardButtonsCol: { flexDirection: 'column-reverse', alignSelf: 'stretch', gap: spacing.xs, marginTop: spacing.xs },
