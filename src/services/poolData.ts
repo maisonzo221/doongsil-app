@@ -179,7 +179,7 @@ function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
 const HAS_SNAPSHOT = LICENSED_POOL_FACILITIES.length > 0;
 
 function mapLicensed(r: LicensedPoolRow): OfficialPool {
-  const [id, name, roadAddress, lotAddress, phone, lat, lng] = r;
+  const [id, name, roadAddress, lotAddress, phone, lat, lng, approx] = r;
   return {
     id,
     name,
@@ -189,6 +189,7 @@ function mapLicensed(r: LicensedPoolRow): OfficialPool {
     statusName: '영업중',
     lat,
     lng,
+    coordApprox: approx === 1 || undefined,
     source: 'business',
   };
 }

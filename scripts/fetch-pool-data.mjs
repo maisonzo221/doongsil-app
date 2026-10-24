@@ -79,25 +79,55 @@ async function getPage(pageNo) {
   throw new Error(`${pageNo}페이지를 못 받았어요: ${lastErr?.message}`);
 }
 
-function toRow(item) {
-  if (CLOSED.test(item.SALS_STTS_NM || '')) return { skip: 'closed' };
+// 좌표가 비어 있는 인허가 기록이 많다. 그런 수영장을 통째로 버리면 청주·고양처럼 좌표 입력이 안 된
+// 지역은 앱에 하나도 안 나온다. 그래서 같은 읍·면·동(예: "충청북도 청주시 흥덕구 가경동")에 좌표가 있는
+// 수영장들의 평균 위치로 대신 채우고, 행 끝에 1을 붙여 "근사 좌표"로 표시한다(앱은 이런 곳에 지도 핀을 안 찍고
+// 길찾기를 주소로 연다). 같은 동에 좌표 있는 곳이 하나도 없으면 어림짐작하지 않고 건너뛴다.
+function dongKey(item) {
+  const addr = String(item.LOTNO_ADDR || item.ROAD_NM_ADDR || '').trim();
+  const tokens = addr.split(/\s+/);
+  const idx = tokens.findIndex((t, i) => i >= 2 && /(동|읍|면|리|가)$/.test(t) && !/(로|길)$/.test(t));
+  return idx > 0 ? tokens.slice(0, idx + 1).join(' ') : '';
+}
+const dongCoords = new Map();
+function addDongCoord(item, lat, lng) {
+  const k = dongKey(item);
+  if (!k) return;
+  const a = dongCoords.get(k) || [];
+  a.push([lat, lng]);
+  dongCoords.set(k, a);
+}
+function convert(item) {
   const x = Number(item.CRD_INFO_X);
   const y = Number(item.CRD_INFO_Y);
-  if (!x || !y) return { skip: 'nocoord' };
-  let lat;
-  let lng;
+  if (!x || !y) return null;
   try {
-    [lng, lat] = proj4(BESSEL_TM, WGS84, [x, y]);
+    const [lng, lat] = proj4(BESSEL_TM, WGS84, [x, y]);
+    return lat > 32.5 && lat < 39.5 && lng > 123.5 && lng < 132.5 ? { lat, lng } : 'bad';
   } catch {
-    return { skip: 'badcoord' };
+    return 'bad';
   }
-  if (!(lat > 32.5 && lat < 39.5 && lng > 123.5 && lng < 132.5)) return { skip: 'badcoord' };
+}
+
+function toRow(item) {
+  if (CLOSED.test(item.SALS_STTS_NM || '')) return { skip: 'closed' };
+  let approx = 0;
+  let c = convert(item);
+  if (c === 'bad') return { skip: 'badcoord' };
+  if (!c) {
+    const pts = dongCoords.get(dongKey(item));
+    if (!pts || pts.length === 0) return { skip: 'nocoord' };
+    c = { lat: pts.reduce((a, p) => a + p[0], 0) / pts.length, lng: pts.reduce((a, p) => a + p[1], 0) / pts.length };
+    approx = 1;
+  }
+  const { lat, lng } = c;
   const name = String(item.BPLC_NM || '').trim();
   if (!name || !item.MNG_NO) return { skip: 'noname' };
   const road = String(item.ROAD_NM_ADDR || item.LOTNO_ADDR || '').trim();
   const lot = String(item.LOTNO_ADDR || '').trim();
   return {
-    row: [String(item.MNG_NO), name, road, lot && lot !== road ? lot : '', String(item.TELNO || '').trim(), +lat.toFixed(5), +lng.toFixed(5)],
+    row: [String(item.MNG_NO), name, road, lot && lot !== road ? lot : '', String(item.TELNO || '').trim(), +lat.toFixed(5), +lng.toFixed(5), ...(approx ? [1] : [])],
+    approx,
   };
 }
 
@@ -159,7 +189,13 @@ function toRow(item) {
   console.log(`  관리번호 ${idGroups.size}종류 / 전체 ${raw.length}행 → 같은 관리번호가 여러 행인 경우 ${sharedIds}종류`);
   console.log(`  관리번호+이름+주소가 같은 기록을 합친 뒤 ${latest.size}곳 (합쳐진 기록 ${raw.length - latest.size}건)`);
 
+  for (const item of latest.values()) {
+    if (CLOSED.test(item.SALS_STTS_NM || '')) continue;
+    const c = convert(item);
+    if (c && c !== 'bad') addDongCoord(item, c.lat, c.lng);
+  }
   const skipped = { closed: 0, nocoord: 0, badcoord: 0, noname: 0, dup: raw.length - latest.size };
+  let approxCount = 0;
   const built = [];
   for (const item of latest.values()) {
     const r = toRow(item);
@@ -167,6 +203,7 @@ function toRow(item) {
       skipped[r.skip]++;
       continue;
     }
+    if (r.approx) approxCount++;
     built.push(r.row);
   }
   const rows = built.sort((a, b) => a[2].localeCompare(b[2], 'ko') || a[1].localeCompare(b[1], 'ko'));
@@ -188,8 +225,8 @@ function toRow(item) {
     `// 자동 생성 파일 — scripts/fetch-pool-data.mjs로 만든다. 직접 고치지 않는다.\n` +
     `// 출처: 행정안전부_생활_수영장업 (data.go.kr 15155038), 생성일 ${today}\n` +
     `// 영업 중이고 좌표가 있는 인허가 수영장 ${rows.length.toLocaleString()}곳 (전체 ${raw.length.toLocaleString()}건 중).\n` +
-    `// 행: [관리번호, 이름, 도로명주소, 지번주소(도로명과 같으면 빈칸), 전화, 위도, 경도]\n` +
-    `export type LicensedPoolRow = readonly [\n  id: string,\n  name: string,\n  roadAddress: string,\n  lotAddress: string,\n  phone: string,\n  lat: number,\n  lng: number,\n];\n\n` +
+    `// 행: [관리번호, 이름, 도로명주소, 지번주소(도로명과 같으면 빈칸), 전화, 위도, 경도, (근사 좌표면 1)]\n` +
+    `export type LicensedPoolRow = readonly [\n  id: string,\n  name: string,\n  roadAddress: string,\n  lotAddress: string,\n  phone: string,\n  lat: number,\n  lng: number,\n  approx?: number,\n];\n\n` +
     `export const LICENSED_POOLS_UPDATED = '${today}';\n\n` +
     `export const LICENSED_POOL_FACILITIES: readonly LicensedPoolRow[] = [\n` +
     rows.map((r) => `  ${JSON.stringify(r)},`).join('\n') +
@@ -206,6 +243,7 @@ function toRow(item) {
     sido[k] = (sido[k] || 0) + 1;
   }
   console.log(`\n✅ ${rows.length.toLocaleString()}곳 저장 → ${path.relative(ROOT, OUT)} (${(Buffer.byteLength(body) / 1024).toFixed(0)}KB)`);
+  console.log(`   그중 좌표가 없어 같은 동 평균 위치로 채운 곳(근사): ${approxCount}곳`);
   console.log(`   제외: 폐업/취소 ${skipped.closed} · 좌표 없음 ${skipped.nocoord} · 좌표 이상 ${skipped.badcoord} · 이름 없음 ${skipped.noname} · 중복 ${skipped.dup}`);
   console.log('   시/도별: ' + Object.entries(sido).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' | '));
   const goyang = rows.filter((r) => /고양시/.test(r[2])).length;

@@ -13,6 +13,8 @@ step() { printf '\n━━ %s\n' "$1"; }
 fail() { printf '\n✗ %s\n  이 화면을 캡처해서 보내주세요.\n' "$1"; exit 1; }
 
 step "1/7 최신 코드 받기"
+# 수집 단계가 매번 새로 만들어내는 파일이라 지워도 되고, 남겨두면 코드 받을 때 충돌이 날 수 있어서 먼저 되돌린다.
+git checkout -- src/data/licensedPoolFacilities.ts src/data/candidatePoolFacilities.ts 2>/dev/null
 git pull --ff-only origin main || fail "git pull 실패"
 npm install --no-audit --no-fund || fail "npm install 실패"
 
