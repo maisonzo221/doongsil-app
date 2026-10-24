@@ -16,12 +16,12 @@ const SWIM_POSES: SwimPose[] = ['free', 'fly', 'breast', 'back'];
 
 const FRONT = { w: 290, h: 509 };
 const SWIM_SIZE: Record<SwimPose, { w: number; h: number }> = {
-  free: { w: 408, h: 220 },
-  fly: { w: 375, h: 209 },
-  breast: { w: 312, h: 207 },
-  back: { w: 394, h: 191 },
+  free: { w: 408, h: 218 },
+  fly: { w: 374, h: 200 },
+  breast: { w: 312, h: 200 },
+  back: { w: 393, h: 185 },
 };
-const SWIM_BOX = { w: 408, h: 220 };
+const SWIM_BOX = { w: 408, h: 218 };
 const SWIM_HOLD_MS = 4200;
 const SWIM_FADE_MS = 600;
 
