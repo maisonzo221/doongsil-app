@@ -74,7 +74,7 @@ function CalendarStackNavigator() {
       <CalendarStack.Screen
         name="BearCustomize"
         component={BearCustomizeScreen}
-        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
+        options={{ headerShown: true, title: '캐릭터 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
       />
       <CalendarStack.Screen
         name="StatDetail"
@@ -97,7 +97,7 @@ function FriendsStackNavigator() {
       <FriendsStack.Screen
         name="BearCustomize"
         component={BearCustomizeScreen}
-        options={{ headerShown: true, title: '내 둥실곰 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
+        options={{ headerShown: true, title: '캐릭터 꾸미기', headerBackButtonDisplayMode: 'minimal' }}
       />
       <FriendsStack.Screen
         name="Settings"

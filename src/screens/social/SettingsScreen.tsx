@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import BearSprite from '../../components/bear/BearSprite';
+import { useBearState } from '../../storage/bear';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { FriendsStackParamList } from '../../navigation/socialTypes';
 import {
@@ -29,6 +31,7 @@ type Props = NativeStackScreenProps<FriendsStackParamList, 'Settings'>;
 
 export default function SettingsScreen({ navigation }: Props) {
   const [me, setMe] = useState<UserProfile | null>(null);
+  const bear = useBearState();
   const [deleting, setDeleting] = useState(false);
   const [editingTenure, setEditingTenure] = useState(false);
   const [tenureYear, setTenureYear] = useState('');
@@ -128,14 +131,25 @@ export default function SettingsScreen({ navigation }: Props) {
 
         {me && me.provider === 'apple' && (
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>닉네임</Text>
-            <Text style={styles.cardValue}>{me.nicknameKo}</Text>
-            {me.inviteCode && (
-              <>
-                <Text style={[styles.cardLabel, { marginTop: spacing.sm }]}>초대 코드</Text>
-                <Text style={styles.cardValue}>{me.inviteCode}</Text>
-              </>
-            )}
+            {/* 닉네임·초대 코드는 왼쪽에, 내 캐릭터는 오른쪽에(캘린더 화면처럼). 꾸미기 버튼은 캐릭터 바로 아래. */}
+            <View style={styles.profileTop}>
+              <View style={styles.profileText}>
+                <Text style={styles.cardLabel}>닉네임</Text>
+                <Text style={styles.cardValue}>{me.nicknameKo}</Text>
+                {me.inviteCode && (
+                  <>
+                    <Text style={[styles.cardLabel, { marginTop: spacing.sm }]}>초대 코드</Text>
+                    <Text style={styles.cardValue}>{me.inviteCode}</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.bearCol}>
+                <BearSprite mode="idle" height={118} equipped={bear.equipped} interactive />
+                <TouchableOpacity style={styles.dressBtn} onPress={() => navigation.navigate('BearCustomize')}>
+                  <Text style={styles.dressBtnText}>캐릭터 꾸미기</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             <Text style={[styles.cardLabel, { marginTop: spacing.sm }]}>수력</Text>
             {editingTenure ? (
@@ -225,10 +239,6 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         )}
 
-        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('BearCustomize')}>
-          <Text style={styles.rowText}>내 둥실곰 꾸미기</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowText}>개인정보 처리방침</Text>
         </TouchableOpacity>
@@ -258,6 +268,11 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginBottom: spacing.lg,
   },
+  profileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.xs },
+  profileText: { flex: 1 },
+  bearCol: { alignItems: 'center' },
+  dressBtn: { marginTop: spacing.hairline, backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  dressBtnText: { fontFamily: fonts.bold, color: colors.primary, fontSize: 12 },
   cardLabel: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12 },
   cardValue: { fontFamily: fonts.semibold, color: colors.text, fontSize: 16, marginTop: 2 },
   row: {

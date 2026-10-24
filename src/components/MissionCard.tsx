@@ -143,7 +143,7 @@ export default function MissionCard({ stats, onAddRecord, onOpenCustomize }: Pro
           {hint}
         </Text>
         <TouchableOpacity onPress={onOpenCustomize} style={styles.dressBtn}>
-          <Text style={styles.dressBtnText}>곰 꾸미기</Text>
+          <Text style={styles.dressBtnText}>캐릭터 꾸미기</Text>
         </TouchableOpacity>
       </View>
 
