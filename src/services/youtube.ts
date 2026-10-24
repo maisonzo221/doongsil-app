@@ -12,7 +12,8 @@ const API_KEY = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY;
 // v2: YoutubeVideo에 thumbnailCandidates가 추가되면서 모양이 바뀌었다. 이전 버전이 저장해둔
 // v1 캐시를 그대로 읽으면 thumbnailCandidates가 없는 옛날 객체가 돌아와서 화면에서 터진다 —
 // 그래서 캐시 키 자체를 새 prefix로 바꿔 옛 캐시를 전부 무시하고 새로 받아오게 한다.
-const CACHE_PREFIX = '@doongsil/youtube/v2/';
+// v3: 가수 수영(소녀시대) 영상을 거르는 규칙을 강화하면서, 예전 규칙으로 저장된 캐시를 버리려고 올렸다.
+const CACHE_PREFIX = '@doongsil/youtube/v3/';
 
 export interface YoutubeVideo {
   id: string;
@@ -79,7 +80,8 @@ async function readCache(cacheKey: string): Promise<CachedEntry | null> {
     if (!Array.isArray(parsed.videos) || parsed.videos.some((v) => !Array.isArray(v.thumbnailCandidates))) {
       return null;
     }
-    return parsed;
+    // 예전 규칙으로 저장된 영상 중에 지금 규칙으로는 빼야 하는 게 있으면 읽을 때 같이 거른다.
+    return { ...parsed, videos: parsed.videos.filter((v) => !isBannedContent(v.title, v.channelTitle, '')) };
   } catch {
     return null;
   }
@@ -99,10 +101,26 @@ async function writeCache(cacheKey: string, entry: CachedEntry): Promise<void> {
 const BANNED_CONTENT_PATTERN =
   /(야동|성인방송|19금|노출방송|누드|섹스|자위|음란|마약|필로폰|대마초|도박|불법토토|토토사이트|카지노|베팅사이트|porn|xxx|nsfw|onlyfans|nude|naked girl|sex tape|cocaine|marijuana|weed strain|gambling site|casino bonus)/i;
 
-// "수영"이 소녀시대 멤버(배우/가수 최수영) 이름이기도 해서, 수영(swimming) 검색에 그 사람 영상이 섞여 들어온다.
-// 이름이 확실한 표현만 걸러낸다 — "배우 수영"처럼 애매한 건 "수영 배우기"(swimming 강습) 영상을 같이 막을 수 있어 뺐다.
-const NOT_SWIMMING_PERSON_PATTERN = /(소녀시대|최수영|snsd|girls['’]?\s*generation|choi\s*soo-?young|sooyoung|배우\s*수영\s*(드라마|인터뷰|화보|근황|출연|열애|결혼|예능|영화)|수영\s*(배우|가수)\s*(인터뷰|화보|근황|출연|드라마|예능|영화))/i;
-const SEARCH_EXCLUDE_TERMS = ' -소녀시대 -최수영';
+// "수영"이 소녀시대 멤버(가수·배우 최수영) 이름이기도 해서, 수영(swimming) 검색에 그 사람 영상이 섞여 들어온다.
+// 제목·채널·설명에 아래 중 하나라도 있으면 뺀다.
+//  1) 이름이 확실한 표현: 소녀시대/소시/최수영/SNSD/Girls' Generation/Sooyoung/Soo Young 등
+//  2) "수영" 바로 뒤에 노래·무대·뮤비·직캠·화보·근황·드라마·예능 같은 연예 단어가 붙은 경우
+//  3) "가수/배우/멤버/아이돌 수영"처럼 직업이 앞에 붙은 경우
+// "수영 배우기"(swimming 강습)처럼 진짜 수영 영상이 걸리지 않게, "수영 배우"는 뒤에 연예 단어가 붙을 때만 뺀다.
+const SINGER_NAME_PATTERN =
+  /(소녀시대|소시(?![가-힣])|최수영|snsd|girls['’]?\s*generation|choi\s*soo[\s-]?young|soo[\s-]?young|sooyoung|smtown|걸그룹|girl\s*group|케이팝|k-?pop|아이돌)/i;
+const ENTERTAINMENT_WORDS =
+  '노래|신곡|뮤비|뮤직\\s*비디오|무대|콘서트|팬미팅|컴백|앨범|직캠|라이브|공연|커버|화보|인터뷰|근황|드라마|예능|출연|열애|결혼|영화|ost|mv|fancam|브이로그|vlog|팬싸|팬사인회|막방|음방|뮤직뱅크|인기가요';
+const SINGER_CONTEXT_PATTERN = new RegExp(
+  `(수영\\s*(?:의|이|가|은|는|도)?\\s*(?:${ENTERTAINMENT_WORDS}|배우\\s*(?:${ENTERTAINMENT_WORDS})|가수)` +
+    `|(?:가수|배우|멤버|아이돌)\\s*수영(?!\\s*(?:장|강습|레슨|영법|법|선수|대회|복|모|장비|배우기|배우는|배우려)))`,
+  'i'
+);
+const NOT_SWIMMING_PERSON_PATTERN = {
+  test: (text: string) => SINGER_NAME_PATTERN.test(text) || SINGER_CONTEXT_PATTERN.test(text),
+};
+// 유튜브 검색 단계에서도 미리 빼서, 검색 결과 자리를 이런 영상이 차지하지 않게 한다.
+const SEARCH_EXCLUDE_TERMS = ' -소녀시대 -최수영 -SNSD -sooyoung -가수 -아이돌 -직캠 -뮤비';
 
 function isBannedContent(title: string, channelTitle: string, description: string): boolean {
   const text = `${title} ${channelTitle} ${description}`;
