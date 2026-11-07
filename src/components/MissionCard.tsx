@@ -3,7 +3,7 @@ import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text
 import BearStamp from './BearStamp';
 import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
 import { ITEM_IMAGES } from '../data/itemImages';
-import { autoValue, completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
+import { autoValue, completeMission, currentTier, levelOf, syncAutoMissions, useBearState } from '../storage/bear';
 import type { CompleteResult, SwimStats } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
 
@@ -178,7 +178,7 @@ export default function MissionCard({ stats, onAddRecord, onOpenCustomize }: Pro
               <>
                 <Text style={styles.rewardTitle}>{reward.tierCompleted ? `${reward.tierCompleted.name} 승급!` : reward.mission.doneMessage}</Text>
                 {reward.tierCompleted && <Text style={styles.rewardSub}>Lv.{levelOf(bear)} 둥실곰이 되었어요</Text>}
-                {reward.gained.length > 0 && <Text style={styles.rewardSub}>아이템을 받았어요!</Text>}
+                {reward.gained.length > 0 && <Text style={styles.rewardSub}>선물이 도착했어요!</Text>}
                 <View style={styles.rewardItems}>
                   {reward.gained.map((id) => (
                     <View key={id} style={styles.rewardItem}>
@@ -189,32 +189,9 @@ export default function MissionCard({ stats, onAddRecord, onOpenCustomize }: Pro
                     </View>
                   ))}
                 </View>
-                <View style={styles.rewardButtonsCol}>
-                  <TouchableOpacity style={styles.secondaryBtn} onPress={() => setReward(null)}>
-                    <Text style={styles.secondaryBtnText}>확인</Text>
-                  </TouchableOpacity>
-                  {reward.gained.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.primaryBtn}
-                      onPress={async () => {
-                        // 받은 아이템 중 바로 입을 수 있는 것을 입혀준다(수영복은 팬티가 기본).
-                        const patch: Record<string, unknown> = {};
-                        for (const id of reward.gained) {
-                          if (id === 'trunks' && !patch.suit) patch.suit = 'trunks';
-                          else if (id === 'onepiece' && !patch.suit) patch.suit = 'onepiece';
-                          else if (id === 'goggles') patch.goggles = true;
-                          else if (id === 'cap') patch.cap = true;
-                          else if (id.startsWith('medal')) patch.medal = id;
-                        }
-                        await setEquipped(patch);
-                        setReward(null);
-                        onOpenCustomize();
-                      }}
-                    >
-                      <Text style={styles.primaryBtnText}>곰에게 입히러 가기</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity style={styles.rewardBtn} onPress={() => setReward(null)}>
+                  <Text style={styles.rewardBtnText}>{reward.gained.length > 0 ? '받기' : '확인'}</Text>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -357,13 +334,14 @@ const styles = StyleSheet.create({
   sourceNote: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, marginBottom: spacing.xs },
   rewardLine: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 13, marginTop: spacing.xs },
   rewardButtons: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs },
-  rewardButtonsCol: { flexDirection: 'column-reverse', alignSelf: 'stretch', gap: spacing.xs, marginTop: spacing.xs },
   primaryBtn: { flex: 1.6, backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 12, alignItems: 'center' },
   primaryBtnText: { fontFamily: fonts.bold, color: colors.white, fontSize: 14 },
   secondaryBtn: { flex: 1, backgroundColor: colors.cardSoft, borderRadius: radius.pill, paddingVertical: 12, alignItems: 'center' },
   secondaryBtnText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 14 },
   btnDisabled: { opacity: 0.45 },
   rewardSheet: { alignItems: 'center' },
+  rewardBtn: { alignSelf: 'stretch', backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: spacing.xs },
+  rewardBtnText: { fontFamily: fonts.bold, color: colors.white, fontSize: 16 },
   rewardTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, marginBottom: 4 },
   rewardSub: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 13, marginBottom: 4 },
   rewardItems: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginVertical: spacing.sm },
