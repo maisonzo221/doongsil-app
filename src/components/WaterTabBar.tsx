@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Svg, { ClipPath, Defs, Image as SvgImage, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
+import Svg, { ClipPath, Defs, Ellipse, Image as SvgImage, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import BearSprite, { bearBox } from './bear/BearSprite';
 import { useBearState } from '../storage/bear';
@@ -11,7 +11,13 @@ import { colors } from '../theme';
 
 const WATER_TOP = 18; // 아이콘 줄 위쪽으로 확보한 물 영역 (아이콘 아래 여백과 같게)
 const ROW = 60; // 아이콘 줄 높이
-const HILL_H = 24; // 가운데 메뉴가 솟아오른 높이
+const HILL_H = 14; // 가운데 메뉴가 솟아오른 높이 (너무 높으면 채팅 입력창 같은 화면 아래쪽 내용을 가린다)
+/** 가운데 언덕이 메뉴바 위쪽으로 튀어나오는 높이. 화면 맨 아래에 입력창이 있는 화면은 이만큼 띄워야 안 가려진다. */
+export const TAB_HILL_H = HILL_H;
+const CENTER_LIFT = 8; // 가운데(캘린더) 아이콘이 다른 아이콘보다 위로 올라간 만큼
+const DROP_W = 38; // 선택한 메뉴 뒤에 뜨는 물방울
+const DROP_H = 46;
+const DROP_CY = 31; // 물방울 둥근 부분의 중심 높이 (아이콘 중심이 여기에 오도록 맞춘다)
 const HILL_B = 66; // 솟아오른 부분의 가로 반폭
 const BEAR_H = 34; // 메뉴 아이콘 하나쯤의 크기
 // 그림(water.jpg)에서 곰이 없는 물 부분을 잘라 쓴다 (그림 픽셀 좌표).
@@ -100,6 +106,28 @@ function WaveStrip({
   );
 }
 
+/** 선택된 메뉴를 알려주는 물방울: 뾰족한 끝이 위, 둥근 부분이 아이콘 뒤에 온다. */
+function WaterDrop() {
+  return (
+    <Svg width={DROP_W} height={DROP_H} viewBox={`0 0 ${DROP_W} ${DROP_H}`}>
+      <Defs>
+        <SvgGradient id="dropFill" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#E8F9FF" stopOpacity="0.6" />
+          <Stop offset="0.55" stopColor="#7FDCFF" stopOpacity="0.5" />
+          <Stop offset="1" stopColor="#1F9BDA" stopOpacity="0.6" />
+        </SvgGradient>
+      </Defs>
+      <Path
+        d="M19,1 C19,1 5,18 5,31 A14,14 0 0 0 33,31 C33,18 19,1 19,1 Z"
+        fill="url(#dropFill)"
+        stroke="rgba(255,255,255,0.92)"
+        strokeWidth={1.3}
+      />
+      <Ellipse cx={15.5} cy={11} rx={1.5} ry={3.6} fill="rgba(255,255,255,0.85)" transform="rotate(24 15.5 11)" />
+    </Svg>
+  );
+}
+
 type TabIcon = React.ComponentType<{ color: string; size?: number }>;
 
 export default function WaterTabBar({
@@ -139,6 +167,22 @@ export default function WaterTabBar({
     }
     return { xs, ys, rot };
   }, [W, cx]);
+
+  // 선택된 메뉴 뒤의 물방울: 메뉴를 바꾸면 그 자리로 미끄러져 가며 톡 하고 맺힌다.
+  const dropPos = useRef(new Animated.Value(state.index)).current;
+  const dropSquash = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.spring(dropPos, { toValue: state.index, friction: 7, tension: 70, useNativeDriver: true }).start();
+    dropSquash.setValue(0.8);
+    Animated.spring(dropSquash, { toValue: 1, friction: 3.5, tension: 120, useNativeDriver: true }).start();
+  }, [dropPos, dropSquash, state.index]);
+  const dropIn = state.routes.map((_, i) => i);
+  const dropX = dropPos.interpolate({ inputRange: dropIn, outputRange: state.routes.map((_, i) => (i + 0.5) * slot - DROP_W / 2), extrapolate: 'clamp' });
+  const dropY = dropPos.interpolate({
+    inputRange: dropIn,
+    outputRange: state.routes.map((r) => WATER_TOP + (r.name === 'Calendar' ? ROW / 2 - CENTER_LIFT : ROW / 2) - DROP_CY),
+    extrapolate: 'clamp',
+  });
 
   const bearY = bearX.interpolate({ inputRange: xs, outputRange: ys, extrapolate: 'clamp' });
   const bearRot = bearX.interpolate({ inputRange: xs, outputRange: rot, extrapolate: 'clamp' });
@@ -254,6 +298,16 @@ export default function WaterTabBar({
         <WaveStrip width={W} height={height} top={0} period={110} amplitude={4} duration={7000} reverse fill="rgba(255,255,255,0.22)" delay={300} />
       </View>
 
+      {/* 선택된 메뉴의 물방울 */}
+      {n > 1 && (
+        <Animated.View
+          pointerEvents="none"
+          style={{ position: 'absolute', left: 0, top: 0, width: DROP_W, height: DROP_H, transform: [{ translateX: dropX }, { translateY: dropY }, { scaleY: dropSquash }], transformOrigin: '50% 100%' }}
+        >
+          <WaterDrop />
+        </Animated.View>
+      )}
+
       {/* 메뉴 아이콘 */}
       <View style={[styles.row, { top: WATER_TOP, height: ROW }]}>
         {state.routes.map((route, index) => {
@@ -274,7 +328,7 @@ export default function WaterTabBar({
               accessibilityLabel={LABELS[route.name] ?? route.name}
               style={styles.tab}
               // 아이콘이 위로 올라간 만큼, 올라간 부분도 눌리게 터치 영역을 위쪽으로 넓힌다.
-              hitSlop={isCenter ? { top: 28 } : undefined}
+              hitSlop={isCenter ? { top: HILL_H + 6 } : undefined}
             >
               <View style={[styles.iconWrap, isCenter && styles.iconWrapCenter]}>
                 {isAlert && <Animated.View style={[styles.alertGlow, { opacity: pulse }]} />}
@@ -295,7 +349,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   iconWrap: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   // 가운데(캘린더) 메뉴는 솟아오른 물결 안쪽에 오도록 다른 메뉴보다 훨씬 위에 둔다.
-  iconWrapCenter: { marginTop: -28 },
+  iconWrapCenter: { marginTop: -CENTER_LIFT * 2 },
   alertGlow: { position: 'absolute', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.alert },
   alertDot: { position: 'absolute', top: 2, right: 2, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.alert, borderWidth: 1.5, borderColor: colors.white },
 });

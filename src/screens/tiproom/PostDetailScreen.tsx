@@ -14,6 +14,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import { useTabBarClearance } from '../../utils/useTabBarClearance';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
@@ -39,6 +40,7 @@ function timeAgo(iso: string): string {
 
 export default function PostDetailScreen({ route, navigation }: Props) {
   const { postId } = route.params;
+  const tabClearance = useTabBarClearance();
   const [post, setPost] = useState<BoardPost | null>(null);
   const [comments, setComments] = useState<BoardComment[]>([]);
   const [me, setMe] = useState<Me | null>(null);
@@ -141,7 +143,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
           ))}
         </ScrollView>
 
-        <View style={styles.inputRow}>
+        <View style={[styles.inputRow, { marginBottom: tabClearance }]}>
           <TextInput
             style={styles.textInput}
             placeholder="댓글 남기기"

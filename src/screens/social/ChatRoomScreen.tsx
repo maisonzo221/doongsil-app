@@ -18,6 +18,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
+import { useTabBarClearance } from '../../utils/useTabBarClearance';
 import MessageBubble from '../../components/MessageBubble';
 import { useLeaveRoom } from '../../components/LeaveRoomFlow';
 import { MembersIcon } from '../../components/icons/TabIcons';
@@ -57,6 +58,8 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [ownerId, setOwnerId] = useState(route.params.ownerId);
   const [myId, setMyId] = useState<string | null>(null);
   const [members, setMembers] = useState<Record<string, Friend>>({});
+  // 메뉴바 가운데 언덕이 입력창을 가리지 않게, 키보드가 내려가 있을 때 입력창을 그만큼 띄운다.
+  const tabClearance = useTabBarClearance();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // 멤버별로 어디까지 읽었는지 — 말풍선 옆 "안 읽은 사람 수" 계산용.
   const [readers, setReaders] = useState<MemberReadState[]>([]);
@@ -349,7 +352,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
           ListEmptyComponent={<Text style={styles.empty}>아직 대화가 없어요.</Text>}
         />
 
-        <View style={styles.inputRow}>
+        <View style={[styles.inputRow, { marginBottom: tabClearance }]}>
           <TouchableOpacity style={styles.shareBtn} onPress={handleShareLatestRecord}>
             <Text style={styles.shareBtnText}>🏊</Text>
           </TouchableOpacity>
