@@ -3,7 +3,7 @@ import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text
 import BearStamp from './BearStamp';
 import { BUY_GEAR_LIST, ETIQUETTE_LIST, ITEMS, LEVEL_NAMES, MissionDef, TIERS } from '../data/missions';
 import { ITEM_IMAGES } from '../data/itemImages';
-import { autoValue, completeMission, currentTier, levelOf, syncAutoMissions, useBearState } from '../storage/bear';
+import { autoValue, completeMission, currentTier, levelOf, setEquipped, syncAutoMissions, useBearState } from '../storage/bear';
 import type { CompleteResult, SwimStats } from '../storage/bear';
 import { colors, fonts, radius, spacing } from '../theme';
 
@@ -189,9 +189,37 @@ export default function MissionCard({ stats, onAddRecord, onOpenCustomize }: Pro
                     </View>
                   ))}
                 </View>
-                <TouchableOpacity style={styles.rewardBtn} onPress={() => setReward(null)}>
-                  <Text style={styles.rewardBtnText}>{reward.gained.length > 0 ? '받기' : '확인'}</Text>
-                </TouchableOpacity>
+                <View style={styles.rewardBtns}>
+                  {reward.gained.length > 0 ? (
+                    <>
+                      <TouchableOpacity
+                        style={styles.rewardBtn}
+                        onPress={async () => {
+                          // 받은 아이템 중 바로 입을 수 있는 것을 입혀준다(수영복은 반바지가 기본).
+                          const patch: Record<string, unknown> = {};
+                          for (const id of reward.gained) {
+                            if (id === 'trunks' && !patch.suit) patch.suit = 'trunks';
+                            else if (id === 'onepiece' && !patch.suit) patch.suit = 'onepiece';
+                            else if (id === 'goggles') patch.goggles = true;
+                            else if (id === 'cap') patch.cap = true;
+                            else if (id.startsWith('medal')) patch.medal = id;
+                          }
+                          await setEquipped(patch);
+                          setReward(null);
+                        }}
+                      >
+                        <Text style={styles.rewardBtnText}>바로 입히기</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.rewardBtn, styles.rewardBtnLater]} onPress={() => setReward(null)}>
+                        <Text style={[styles.rewardBtnText, styles.rewardBtnLaterText]}>다음에 입히기</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <TouchableOpacity style={styles.rewardBtn} onPress={() => setReward(null)}>
+                      <Text style={styles.rewardBtnText}>확인</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </>
             )}
           </View>
@@ -340,8 +368,11 @@ const styles = StyleSheet.create({
   secondaryBtnText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 14 },
   btnDisabled: { opacity: 0.45 },
   rewardSheet: { alignItems: 'center' },
-  rewardBtn: { alignSelf: 'stretch', backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center', marginTop: spacing.xs },
+  rewardBtns: { alignSelf: 'stretch', gap: spacing.xs, marginTop: spacing.xs },
+  rewardBtn: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
   rewardBtnText: { fontFamily: fonts.bold, color: colors.white, fontSize: 16 },
+  rewardBtnLater: { backgroundColor: colors.cardSoft },
+  rewardBtnLaterText: { fontFamily: fonts.semibold, color: colors.textMuted },
   rewardTitle: { fontFamily: fonts.bold, fontSize: 22, color: colors.text, marginBottom: 4 },
   rewardSub: { fontFamily: fonts.medium, color: colors.textMuted, fontSize: 13, marginBottom: 4 },
   rewardItems: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginVertical: spacing.sm },
