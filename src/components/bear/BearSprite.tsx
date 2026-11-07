@@ -14,7 +14,7 @@ export type BearMode = 'idle' | 'swim';
 type SwimPose = 'free' | 'fly' | 'breast' | 'back';
 const SWIM_POSES: SwimPose[] = ['free', 'fly', 'breast', 'back'];
 
-const FRONT = { w: 290, h: 509 };
+const FRONT = { w: 432, h: 724 };
 const SWIM_SIZE: Record<SwimPose, { w: number; h: number }> = {
   free: { w: 408, h: 218 },
   fly: { w: 374, h: 200 },
