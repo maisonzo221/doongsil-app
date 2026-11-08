@@ -3,6 +3,10 @@
 // 앱에 번들하는 데이터 파일(src/data/licensedPoolFacilities.ts)로 만든다.
 //
 // 실행: 프로젝트 폴더에서  node scripts/fetch-pool-data.mjs
+//   --json docs/data/pools.json   앱이 인터넷에서 받아 쓰는 갱신용 JSON(+ pools-meta.json)만 만든다.
+//                                 매달 자동으로 도는 GitHub Action(.github/workflows/update-pools.yml)이 쓴다.
+//   --out <파일>                  번들용 TS 파일 위치를 바꾼다(--json과 같이 쓰면 둘 다 만든다).
+//   --force                       직전 JSON보다 20% 넘게 줄어도 그대로 저장한다.
 // 인증키는 .env의 EXPO_PUBLIC_POOL_DATA_API_KEY(앱이 이미 쓰는 그 키)를 그대로 읽는다.
 // 키는 화면/파일에 출력하거나 저장하지 않는다.
 import fs from 'node:fs';
@@ -12,7 +16,11 @@ import proj4 from 'proj4';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outArg = process.argv.indexOf('--out');
-const OUT = outArg > -1 ? path.resolve(process.argv[outArg + 1]) : path.join(ROOT, 'src/data/licensedPoolFacilities.ts');
+const jsonArg = process.argv.indexOf('--json');
+const FORCE = process.argv.includes('--force');
+const JSON_OUT = jsonArg > -1 ? path.resolve(process.argv[jsonArg + 1]) : null;
+// --json만 주면 번들용 TS 파일은 건드리지 않는다(Action이 소스 파일을 바꾸지 않도록).
+const OUT = outArg > -1 ? path.resolve(process.argv[outArg + 1]) : JSON_OUT ? null : path.join(ROOT, 'src/data/licensedPoolFacilities.ts');
 const BASE = process.env.POOL_API_BASE || 'https://apis.data.go.kr/1741000/swimming_pools/info';
 
 const PAGE_SIZE = 100; // 앱이 이미 쓰고 있는 검증된 값
@@ -221,28 +229,56 @@ function toRow(item) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const body =
-    `// 자동 생성 파일 — scripts/fetch-pool-data.mjs로 만든다. 직접 고치지 않는다.\n` +
-    `// 출처: 행정안전부_생활_수영장업 (data.go.kr 15155038), 생성일 ${today}\n` +
-    `// 영업 중이고 좌표가 있는 인허가 수영장 ${rows.length.toLocaleString()}곳 (전체 ${raw.length.toLocaleString()}건 중).\n` +
-    `// 행: [관리번호, 이름, 도로명주소, 지번주소(도로명과 같으면 빈칸), 전화, 위도, 경도, (근사 좌표면 1)]\n` +
-    `export type LicensedPoolRow = readonly [\n  id: string,\n  name: string,\n  roadAddress: string,\n  lotAddress: string,\n  phone: string,\n  lat: number,\n  lng: number,\n  approx?: number,\n];\n\n` +
-    `export const LICENSED_POOLS_UPDATED = '${today}';\n\n` +
-    `export const LICENSED_POOL_FACILITIES: readonly LicensedPoolRow[] = [\n` +
-    rows.map((r) => `  ${JSON.stringify(r)},`).join('\n') +
-    `\n];\n`;
 
-  fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  const tmp = `${OUT}.tmp`;
-  fs.writeFileSync(tmp, body);
-  fs.renameSync(tmp, OUT);
+  if (JSON_OUT) {
+    // 직전 JSON보다 크게 줄었으면 API가 일시적으로 일부만 줬을 가능성이 커서 덮어쓰지 않는다.
+    if (fs.existsSync(JSON_OUT) && !FORCE) {
+      try {
+        const prev = JSON.parse(fs.readFileSync(JSON_OUT, 'utf8'));
+        const prevCount = Array.isArray(prev.rows) ? prev.rows.length : 0;
+        if (prevCount > 0 && rows.length < prevCount * 0.8) {
+          console.error(`❌ 이번에 ${rows.length.toLocaleString()}곳으로, 직전(${prevCount.toLocaleString()}곳)보다 20% 넘게 줄었어요. 일부만 받은 것일 수 있어 덮어쓰지 않았어요. (그래도 쓰려면 --force)`);
+          process.exit(1);
+        }
+      } catch {
+        // 직전 파일을 못 읽으면 비교 없이 새로 쓴다.
+      }
+    }
+    fs.mkdirSync(path.dirname(JSON_OUT), { recursive: true });
+    const payload = { version: 1, updated: today, count: rows.length, rows };
+    const tmpJson = `${JSON_OUT}.tmp`;
+    fs.writeFileSync(tmpJson, JSON.stringify(payload));
+    fs.renameSync(tmpJson, JSON_OUT);
+    // 앱은 이 작은 파일만 먼저 받아서 갱신 여부를 확인하고, 새 버전일 때만 큰 파일을 받는다.
+    const metaPath = path.join(path.dirname(JSON_OUT), `${path.basename(JSON_OUT, '.json')}-meta.json`);
+    fs.writeFileSync(metaPath, JSON.stringify({ version: 1, updated: today, count: rows.length }));
+    console.log(`\n✅ 갱신용 JSON ${rows.length.toLocaleString()}곳 저장 → ${path.relative(ROOT, JSON_OUT)} (${(Buffer.byteLength(JSON.stringify(payload)) / 1024).toFixed(0)}KB)`);
+  }
+
+  if (OUT) {
+    const body =
+      `// 자동 생성 파일 — scripts/fetch-pool-data.mjs로 만든다. 직접 고치지 않는다.\n` +
+      `// 출처: 행정안전부_생활_수영장업 (data.go.kr 15155038), 생성일 ${today}\n` +
+      `// 영업 중이고 좌표가 있는 인허가 수영장 ${rows.length.toLocaleString()}곳 (전체 ${raw.length.toLocaleString()}건 중).\n` +
+      `// 행: [관리번호, 이름, 도로명주소, 지번주소(도로명과 같으면 빈칸), 전화, 위도, 경도, (근사 좌표면 1)]\n` +
+      `export type LicensedPoolRow = readonly [\n  id: string,\n  name: string,\n  roadAddress: string,\n  lotAddress: string,\n  phone: string,\n  lat: number,\n  lng: number,\n  approx?: number,\n];\n\n` +
+      `export const LICENSED_POOLS_UPDATED = '${today}';\n\n` +
+      `export const LICENSED_POOL_FACILITIES: readonly LicensedPoolRow[] = [\n` +
+      rows.map((r) => `  ${JSON.stringify(r)},`).join('\n') +
+      `\n];\n`;
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    const tmp = `${OUT}.tmp`;
+    fs.writeFileSync(tmp, body);
+    fs.renameSync(tmp, OUT);
+    console.log(`\n✅ ${rows.length.toLocaleString()}곳 저장 → ${path.relative(ROOT, OUT)} (${(Buffer.byteLength(body) / 1024).toFixed(0)}KB)`);
+  }
 
   const sido = {};
   for (const r of rows) {
     const k = r[2].split(/\s+/)[0] || '(주소없음)';
     sido[k] = (sido[k] || 0) + 1;
   }
-  console.log(`\n✅ ${rows.length.toLocaleString()}곳 저장 → ${path.relative(ROOT, OUT)} (${(Buffer.byteLength(body) / 1024).toFixed(0)}KB)`);
   console.log(`   그중 좌표가 없어 같은 동 평균 위치로 채운 곳(근사): ${approxCount}곳`);
   console.log(`   제외: 폐업/취소 ${skipped.closed} · 좌표 없음 ${skipped.nocoord} · 좌표 이상 ${skipped.badcoord} · 이름 없음 ${skipped.noname} · 중복 ${skipped.dup}`);
   console.log('   시/도별: ' + Object.entries(sido).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' | '));

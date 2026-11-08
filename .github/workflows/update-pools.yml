@@ -1,0 +1,67 @@
+# 매달 전국 인허가 수영장(행정안전부, data.go.kr)을 다시 내려받아 docs/data/pools.json 을 갱신한다.
+# 앱은 이 파일을 GitHub Pages(https://maisonzo221.github.io/doongsil-app/data/pools.json)에서 받아 쓰므로
+# 신규 개업·폐업이 앱 업데이트(심사) 없이 반영된다.
+#
+# 필요한 설정(한 번만): 저장소 Settings → Secrets and variables → Actions → New repository secret
+#   이름 POOL_DATA_API_KEY  /  값 data.go.kr 인증키(앱에서 쓰는 EXPO_PUBLIC_POOL_DATA_API_KEY 와 같은 키)
+#
+# 지금 바로 한 번 돌려보려면: 저장소 Actions 탭 → "수영장 데이터 월간 갱신" → Run workflow
+name: 수영장 데이터 월간 갱신
+
+on:
+  schedule:
+    - cron: '17 18 1 * *' # 매월 2일 새벽 3시 17분(한국 시간)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-pools
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 의존성 설치
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: 인허가 수영장 내려받기
+        env:
+          EXPO_PUBLIC_POOL_DATA_API_KEY: ${{ secrets.POOL_DATA_API_KEY }}
+        run: |
+          if [ -z "$EXPO_PUBLIC_POOL_DATA_API_KEY" ]; then
+            echo "::error::POOL_DATA_API_KEY 시크릿이 없어요. 저장소 Settings → Secrets and variables → Actions 에 추가하세요."
+            exit 1
+          fi
+          # 직전보다 20% 넘게 줄면 스크립트가 스스로 멈춘다(API가 일부만 준 경우 앱 데이터를 지키기 위해).
+          node scripts/fetch-pool-data.mjs --json docs/data/pools.json
+
+      - name: 바뀐 게 있으면 저장
+        run: |
+          # 날짜만 바뀐 경우(수영장 목록이 그대로)는 저장하지 않는다.
+          if git cat-file -e HEAD:docs/data/pools.json 2>/dev/null; then
+            git show HEAD:docs/data/pools.json > /tmp/old-pools.json
+            if node -e "
+              const a=JSON.parse(require('fs').readFileSync('/tmp/old-pools.json','utf8')).rows;
+              const b=JSON.parse(require('fs').readFileSync('docs/data/pools.json','utf8')).rows;
+              process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)
+            "; then
+              echo "수영장 목록이 지난달과 같아서 저장하지 않아요."
+              git checkout -- docs/data
+              exit 0
+            fi
+          fi
+          git config user.name "doongsil-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data
+          git commit -m "수영장 데이터 월간 갱신 ($(date -u +%Y-%m-%d))"
+          git push

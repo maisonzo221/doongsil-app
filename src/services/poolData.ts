@@ -10,7 +10,8 @@ import { MANUAL_POOL_FACILITIES } from '../data/manualPoolFacilities';
 import { CANDIDATE_POOL_FACILITIES } from '../data/candidatePoolFacilities';
 import { VERIFIED_POOL_FACILITIES } from '../data/verifiedPoolFacilities';
 import { SEOUL_POOL_FACILITIES } from '../data/seoulPoolFacilities';
-import { LICENSED_POOL_FACILITIES, LicensedPoolRow } from '../data/licensedPoolFacilities';
+import type { LicensedPoolRow } from '../data/licensedPoolFacilities';
+import { getLicensedRows, onLicensedPoolsChanged } from './remotePools';
 import { POOL_EXCLUDED_KEYS } from '../data/poolEnrollment';
 import { poolKey } from '../utils/poolKey';
 import { matchesAllWords } from '../utils/koreanSearch';
@@ -62,7 +63,7 @@ export interface OfficialPool {
 }
 
 // 전국 인허가 스냅샷이 번들돼 있으면 API 키 없이도 동작한다.
-export const isPoolDataConfigured = !!API_KEY || LICENSED_POOL_FACILITIES.length > 0;
+export const isPoolDataConfigured = !!API_KEY || getLicensedRows().length > 0;
 
 function toLatLng(xRaw: string, yRaw: string): { lat?: number; lng?: number } {
   const x = Number(xRaw);
@@ -177,7 +178,8 @@ function searchSeoulFacilities(tokens: string[]): OfficialPool[] {
 // ───────── 전국 인허가 수영장 스냅샷 (scripts/fetch-pool-data.mjs로 생성) ─────────
 // 스냅샷이 있으면 기본 목록/동네 검색/이름 검색을 전부 이 데이터로 처리한다 — 실시간 API 없이
 // 전국이 바로 나오고, 페이지 제한도 없다. 비어 있으면(아직 내려받기 전) 예전처럼 API로 대신한다.
-const HAS_SNAPSHOT = LICENSED_POOL_FACILITIES.length > 0;
+// 매달 자동 갱신되는 새 목록이 기기에 있으면 내장 목록 대신 그걸 쓴다(services/remotePools.ts).
+const hasSnapshot = (): boolean => getLicensedRows().length > 0;
 
 function mapLicensed(r: LicensedPoolRow): OfficialPool {
   const [id, name, roadAddress, lotAddress, phone, lat, lng, approx] = r;
@@ -206,14 +208,14 @@ function allPools(): OfficialPool[] {
   ].filter(isVisible);
   const licensed = dedupeAgainst(
     detailed.filter((p) => isInKorea(p.lat, p.lng)),
-    LICENSED_POOL_FACILITIES.map(mapLicensed).filter(isVisible)
+    getLicensedRows().map(mapLicensed).filter(isVisible)
   );
   allPoolsCache = [...detailed, ...licensed];
   return allPoolsCache;
 }
 
 function searchLicensed(tokens: string[]): OfficialPool[] {
-  return LICENSED_POOL_FACILITIES.filter((r) => {
+  return getLicensedRows().filter((r) => {
     const haystack = `${r[1]} ${r[2]} ${r[3]}`;
     return matchesAllWords(haystack, tokens);
   })
@@ -318,7 +320,7 @@ export async function searchOfficialPools(query: string, maxResults = 100): Prom
   const primary = tokens[tokens.length - 1];
   const publicResults = [...searchSeoulFacilities(tokens), ...searchPublicFacilities(tokens)];
 
-  if (HAS_SNAPSHOT) {
+  if (hasSnapshot()) {
     const licensed = dedupeAgainst(publicResults, searchLicensed(tokens)).slice(0, maxResults);
     return withNearby([...publicResults, ...licensed]).filter((p) => p.source === 'business' || hasUsefulInfo(p));
   }
@@ -399,7 +401,7 @@ export async function findPoolsNear(place: PlaceInfo, limit = 40): Promise<Offic
   const bundled = allPools().filter((p) => isInKorea(p.lat, p.lng));
 
   let business: OfficialPool[] = [];
-  if (!HAS_SNAPSHOT && API_KEY && place.regionTerms.length > 0) {
+  if (!hasSnapshot() && API_KEY && place.regionTerms.length > 0) {
     try {
       business = (await Promise.all(place.regionTerms.map(fetchRegionPools))).flat();
     } catch {
@@ -488,3 +490,9 @@ export function mapLinkFor(pool: OfficialPool): string | undefined {
 export function registrationSearchLinkFor(pool: OfficialPool): string {
   return `https://search.naver.com/search.naver?query=${encodeURIComponent(`${pool.name} 수강신청`)}`;
 }
+
+// 새 인허가 목록이 적용되면(앱을 연 뒤 백그라운드로 받은 경우) 이미 만들어 둔 검색용 목록을 비워서 다음 검색부터 새 데이터를 쓴다.
+onLicensedPoolsChanged(() => {
+  allPoolsCache = null;
+  keyIndexCache = null;
+});
