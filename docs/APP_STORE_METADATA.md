@@ -16,7 +16,7 @@
 | 번들 ID | app.doongsil |
 | 카테고리 (주) | 건강 및 피트니스 (Health & Fitness) |
 | 카테고리 (부) | 라이프스타일 (Lifestyle) |
-| 연령 등급 | 4+ |
+| 연령 등급 | App Store Connect 설문 결과를 따름 (채팅·게시판 등 사용자 생성 콘텐츠가 있어서 4+가 아닐 수 있어요. 설문에서 "사용자가 올린 콘텐츠·메시지 있음"으로 답하고, 신고·차단·비속어 필터가 있다고 답하세요) |
 | 개인정보 처리방침 URL | https://maisonzo221.github.io/doongsil-app/privacy.html |
 | 지원 URL | https://maisonzo221.github.io/doongsil-app/support.html |
 | 이용약관 URL | https://maisonzo221.github.io/doongsil-app/terms.html (설명 맨 아래에 링크로 넣거나, App Store Connect의 사용자 지정 EULA 칸에 입력) |
