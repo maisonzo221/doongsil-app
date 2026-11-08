@@ -48,7 +48,7 @@
     <tr><th>연락처 (선택)</th><td>이용자가 권한을 허용한 경우에만, 기기에 저장된 연락처의 전화번호를 서버로 전송해 이미 가입된 이용자인지 조회합니다. 조회에 사용한 전화번호 목록은 서버에 별도로 저장하지 않습니다. 권한을 허용하지 않아도 앱의 다른 기능은 그대로 이용할 수 있습니다.</td></tr>
     <tr><th>건강 데이터 (선택, Apple 건강 연동)</th><td>이용자가 권한을 허용한 경우에만, 애플 건강(HealthKit)의 수영 운동 기록을 읽어와 캘린더에 자동으로 불러옵니다. 읽기 전용이며, 서버로 전송하거나 저장하지 않고 기기 안에만 보관합니다.</td></tr>
     <tr><th>앱 사용 통계 · 오류 정보 (익명)</th><td>앱을 개선하기 위해 어떤 화면이 쓰였는지, 주요 기능(기록 저장, 미션 완료, 글·댓글 작성 등)이 몇 번 쓰였는지, 앱에 오류가 났는지를 익명으로 수집합니다. 계정·이름·전화번호·메시지·글 내용·수영 기록 내용·위치·건강 데이터는 수집하지 않으며, 계정과 연결하지 않고 기기마다 무작위로 만든 번호로만 집계합니다. IP 주소로 지역을 추정하는 것도 사용하지 않습니다. 설정 화면의 "사용 통계 보내기"에서 언제든 끌 수 있습니다.</td></tr>
-    <tr><th>수영 기록 · 캘린더</th><td>이용자가 직접 입력한 수영 기록은 기기 안에만 저장되며, 서버로 전송되지 않습니다.</td></tr>
+    <tr><th>수영 기록 · 캘린더</th><td>이용자가 직접 입력한 수영 기록(날짜·기분·종목·거리·시간·메모 등) 자체는 기기 안에만 저장되며, 서버로 전송되지 않습니다. 다만 수친에게 보여주는 "평균 수영 데이터"를 위해, 기기에서 계산한 요약값(평균 거리·평균 시간·총 기록 수)만 서버에 저장됩니다. 이 요약값은 본인과 수친만 볼 수 있습니다.</td></tr>
     <tr><th>수친 / 수톡·톡톡 채팅방 및 메시지 / 자유게시판 글·댓글</th><td>서비스 제공을 위해 서버(Supabase)에 저장됩니다.</td></tr>
   </table>
 
@@ -90,8 +90,11 @@
   friends list, chat messages and board posts on our backend (Supabase) to provide the
   service. Swim records and HealthKit data stay on your device only. Contacts permission
   (optional) is used only to look up which of your contacts already use the app; phone
-  numbers are not stored afterward. You can sign out or permanently delete your account at
-  any time from the in-app Settings screen. We do not use ads or third-party analytics.
+  numbers are not stored afterward. Only summary values (average distance, average
+  duration, total session count) are stored on the backend so that friends can see them.
+  We collect anonymous usage statistics and error information (PostHog) that are not linked to
+  your account, and you can turn this off in Settings. You can sign out or permanently delete
+  your account at any time from the in-app Settings screen. We do not use ads or ad tracking.
   Contact: maisonzo221@gmail.com</p>
 </div>
 </body>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -8,6 +8,7 @@ import AppleLogo from '../components/AppleLogo';
 import { colors, fonts, radius, spacing } from '../theme';
 import { continueAsGuest, signInWithApple, syncContacts, UserProfile } from '../storage/auth';
 import { track } from '../services/analytics';
+import { PRIVACY_POLICY_URL, TERMS_URL } from '../config/links';
 
 interface Props {
   onAuthenticated: (user: UserProfile) => void;
@@ -99,8 +100,17 @@ export default function AuthScreen({ onAuthenticated }: Props) {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.footnote}>
-              카카오 로그인은 지원하지 않아요. Apple 계정 하나로 간편하게 시작하세요.
+            <Text style={styles.footnote}>Apple 계정 하나로 간편하게 시작하세요.</Text>
+            <Text style={styles.consent}>
+              계속하면{' '}
+              <Text style={styles.consentLink} onPress={() => Linking.openURL(TERMS_URL)}>
+                이용약관
+              </Text>
+              과{' '}
+              <Text style={styles.consentLink} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
+                개인정보 처리방침
+              </Text>
+              에 동의한 것으로 봅니다.
             </Text>
           </>
         ) : (
@@ -177,6 +187,15 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 14,
   },
+  consent: {
+    color: 'rgba(255,255,255,0.7)',
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
+  consentLink: { fontFamily: fonts.semibold, textDecorationLine: 'underline', color: 'rgba(255,255,255,0.92)' },
   footnote: {
     color: 'rgba(255,255,255,0.6)',
     fontFamily: fonts.regular,

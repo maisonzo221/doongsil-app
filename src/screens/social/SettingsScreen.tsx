@@ -24,7 +24,7 @@ import {
   updateSwimSince,
   UserProfile,
 } from '../../storage/auth';
-import { PRIVACY_POLICY_URL } from '../../config/links';
+import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_URL } from '../../config/links';
 import { isAnalyticsConfigured, isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { swimTenureLabel } from '../../utils/swimTenure';
 import { toE164 } from '../../utils/phone';
@@ -268,8 +268,17 @@ export default function SettingsScreen({ navigation }: Props) {
           <Text style={styles.rowText}>차단한 사용자</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(TERMS_URL)}>
+          <Text style={styles.rowText}>이용약관</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowText}>개인정보 처리방침</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[둥실] 문의')}`)}>
+          <Text style={styles.rowText}>문의하기</Text>
+          <Text style={styles.rowHint}>{SUPPORT_EMAIL}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.row} onPress={handleSignOut}>
