@@ -132,8 +132,8 @@ App Store Connect → 앱 → **App Privacy**. 아래는 코드와 서버 구조
 
 ## 문구를 한 번에 올리기 (EAS Metadata)
 
-저장소 루트의 `store.config.json`에 이름, 부제, 설명, 키워드, 프로모션 문구, 지원·개인정보 URL, 새로운 내용, 카테고리, 저작권, 출시 방식(수동), 연령 등급 기본값이 들어 있어요.
+저장소 루트의 `store.config.json`에 이름, 부제, 설명, 키워드, 프로모션 문구, 지원·개인정보 URL, 새로운 내용, 카테고리, 저작권, 출시 방식(수동)이 들어 있어요. (연령 등급은 Apple 설문이 바뀌어 EAS가 못 올리므로 App Store Connect 화면에서 직접 답해요.)
 Mac에서 `cd ~/doongsil-app && npx eas-cli metadata:push` 를 실행하면 App Store Connect에 올라가요. (빌드를 먼저 올려 처리가 끝나 있어야 해요.)
 
-EAS Metadata가 **못 하는 것**(App Store Connect 화면에서 직접): 스크린샷, App Privacy, 가격·국가, 빌드 선택, 콘텐츠 권한, 심사 연락처·메모, 연령 등급 설문의 사용자 콘텐츠·메시지 문항, 심사 제출.
+EAS Metadata가 **못 하는 것**(App Store Connect 화면에서 직접): 연령 등급 설문 전체, 스크린샷, App Privacy, 가격·국가, 빌드 선택, 콘텐츠 권한, 심사 연락처·메모, 연령 등급 설문의 사용자 콘텐츠·메시지 문항, 심사 제출.
 화면에서 고친 뒤에 다시 push하면 덮어써질 수 있으니, 화면에서 수정했다면 먼저 `npx eas-cli metadata:pull` 을 하세요.
