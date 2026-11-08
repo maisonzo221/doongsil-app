@@ -25,6 +25,7 @@ import { toggleBoldWrap, toggleBulletLine } from '../utils/memoFormat';
 import { computePaceSecPer100m, formatPace } from '../utils/pace';
 import { currentYearMonth, formatMonthLabel, todayString } from '../utils/date';
 import { CalendarStackParamList } from '../navigation/types';
+import { track } from '../services/analytics';
 
 type Props = NativeStackScreenProps<CalendarStackParamList, 'RecordForm'>;
 
@@ -129,6 +130,7 @@ export default function RecordFormScreen({ navigation }: Props) {
         memo: memo.trim() || undefined,
         source,
       });
+      track('record_added', { source, has_distance: !!distance, has_duration: !!duration, strokes: strokes.length });
       resetForm();
       await loadTodayRecords();
       Alert.alert('기록 완료', '오늘의 수영이 둥실 담겼어요 🌊');

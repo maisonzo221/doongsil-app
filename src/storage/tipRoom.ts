@@ -2,6 +2,7 @@
 import { supabase } from '../lib/supabase';
 import { containsProfanity } from '../utils/profanity';
 import { getCurrentUser } from './auth';
+import { track } from '../services/analytics';
 
 export class ProfanityBlockedError extends Error {}
 
@@ -81,6 +82,7 @@ export async function createBoardPost(category: string, title: string, body: str
   const me = await getCurrentUser();
   if (!me) return;
   await supabase.from('board_posts').insert({ author_id: me.id, category, title, body });
+  track('post_created', { category });
 }
 
 export async function deleteBoardPost(id: string): Promise<void> {
@@ -117,6 +119,7 @@ export async function addComment(postId: string, body: string): Promise<void> {
     }
     throw error;
   }
+  track('comment_added');
 }
 
 export async function getPools(): Promise<Pool[]> {

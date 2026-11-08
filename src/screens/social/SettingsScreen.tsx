@@ -4,6 +4,7 @@ import {
   Alert,
   Linking,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -24,6 +25,7 @@ import {
   UserProfile,
 } from '../../storage/auth';
 import { PRIVACY_POLICY_URL } from '../../config/links';
+import { isAnalyticsConfigured, isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { swimTenureLabel } from '../../utils/swimTenure';
 import { toE164 } from '../../utils/phone';
 
@@ -33,6 +35,10 @@ export default function SettingsScreen({ navigation }: Props) {
   const [me, setMe] = useState<UserProfile | null>(null);
   const bear = useBearState();
   const [deleting, setDeleting] = useState(false);
+  const [analyticsOn, setAnalyticsOn] = useState(true);
+  useEffect(() => {
+    isAnalyticsEnabled().then(setAnalyticsOn);
+  }, []);
   const [editingTenure, setEditingTenure] = useState(false);
   const [tenureYear, setTenureYear] = useState('');
   const [tenureMonth, setTenureMonth] = useState('');
@@ -239,6 +245,25 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         )}
 
+        {isAnalyticsConfigured && (
+          <View style={[styles.row, styles.switchRow]}>
+            <View style={styles.switchText}>
+              <Text style={styles.rowText}>사용 통계 보내기</Text>
+              <Text style={styles.rowHint}>
+                앱을 고치는 데 쓰려고 어떤 화면이 쓰였는지와 오류가 났는지만 익명으로 보내요. 이름·메시지·기록 내용은 보내지 않아요.
+              </Text>
+            </View>
+            <Switch
+              value={analyticsOn}
+              onValueChange={(v) => {
+                setAnalyticsOn(v);
+                setAnalyticsEnabled(v);
+              }}
+              trackColor={{ true: colors.primary }}
+            />
+          </View>
+        )}
+
         <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('BlockedUsers')}>
           <Text style={styles.rowText}>차단한 사용자</Text>
         </TouchableOpacity>
@@ -286,6 +311,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   rowText: { fontFamily: fonts.semibold, color: colors.text, fontSize: 15 },
+  rowHint: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  switchText: { flex: 1 },
   dangerText: { color: '#D9453C' },
   tenureInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
   tenureInput: {

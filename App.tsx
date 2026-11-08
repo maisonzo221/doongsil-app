@@ -7,8 +7,10 @@ import { View } from 'react-native';
 import RootNavigator from './src/navigation/RootNavigator';
 import LandingScreen from './src/screens/LandingScreen';
 import { colors } from './src/theme';
+import { initAnalytics } from './src/services/analytics';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+initAnalytics();
 
 export default function App() {
   const [fontsLoaded] = useFonts({

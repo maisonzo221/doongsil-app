@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
@@ -31,6 +31,7 @@ import { registerForPushNotificationsAsync } from '../services/pushNotifications
 import { useEnrollmentAlerts, useEnrollmentNotificationSync } from '../services/enrollmentAlerts';
 import { getGroupById } from '../storage/social';
 import { navigateToChatRoom, navigationRef } from './navigationRef';
+import { trackScreen } from '../services/analytics';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CalendarStack = createNativeStackNavigator<CalendarStackParamList>();
@@ -154,6 +155,7 @@ function AppTabs() {
 
 export default function RootNavigator() {
   const [user, setUser] = useState<UserProfile | null | 'loading'>('loading');
+  const currentRoute = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     getCurrentUser().then(setUser);
@@ -192,7 +194,20 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      onReady={() => {
+        currentRoute.current = navigationRef.getCurrentRoute()?.name;
+        if (currentRoute.current) trackScreen(currentRoute.current);
+      }}
+      onStateChange={() => {
+        // 화면 이름만 센다(화면에 넘어가는 값에는 이름·글 제목 같은 것이 들어 있을 수 있어서 보내지 않는다).
+        const name = navigationRef.getCurrentRoute()?.name;
+        if (name && name !== currentRoute.current) trackScreen(name);
+        currentRoute.current = name;
+      }}
+    >
       {user ? <AppTabs /> : <AuthScreen onAuthenticated={setUser} />}
     </NavigationContainer>
   );

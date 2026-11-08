@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { toE164 } from '../utils/phone';
 import { containsProfanity } from '../utils/profanity';
 import { getCurrentUser } from './auth';
+import { track } from '../services/analytics';
 
 export interface Friend {
   id: string;
@@ -132,6 +133,7 @@ export async function addFriendById(targetId: string): Promise<void> {
   // 호출하는 쪽에서 진짜 실패를 알 수 있게 한다.
   const { error } = await supabase.rpc('add_mutual_friend', { target_id: targetId });
   if (error) throw error;
+  track('friend_added');
 }
 
 export async function addFriendByInviteCode(
@@ -301,6 +303,7 @@ export async function sendTextMessage(groupId: string, text: string): Promise<vo
     }
     throw error;
   }
+  track('message_sent');
 }
 
 export async function shareRecordToGroup(groupId: string, summary: string): Promise<void> {

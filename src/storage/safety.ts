@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCurrentUser, onAuthChange } from './auth';
+import { track } from '../services/analytics';
 
 export type ReportTargetType = 'message' | 'post' | 'comment' | 'user';
 
@@ -31,6 +32,7 @@ export async function reportContent(input: ReportInput): Promise<void> {
     target_text: input.targetText?.slice(0, 1000) ?? null,
   });
   if (error) throw error;
+  track('report_submitted', { target_type: input.targetType, reason: input.reason });
 }
 
 // ---- 차단 목록 (메모리 캐시 + 구독) ----
@@ -96,6 +98,7 @@ export async function blockUser(userId: string): Promise<void> {
   if (error) throw error;
   blocked = new Set(blocked).add(userId);
   emit();
+  track('user_blocked');
 }
 
 export async function unblockUser(userId: string): Promise<void> {

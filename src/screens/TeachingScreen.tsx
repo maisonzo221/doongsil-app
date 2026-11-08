@@ -24,11 +24,18 @@ import {
   youtubeWatchUrl,
   YoutubeVideo,
 } from '../services/youtube';
+import { track } from '../services/analytics';
 
 function openInYoutube(id: string) {
   Alert.alert('유튜브로 이동', '영상을 보려면 유튜브 앱(또는 웹)으로 이동해요.', [
     { text: '취소', style: 'cancel' },
-    { text: '이동', onPress: () => Linking.openURL(youtubeWatchUrl(id)) },
+    {
+      text: '이동',
+      onPress: () => {
+        track('teaching_video_opened');
+        Linking.openURL(youtubeWatchUrl(id));
+      },
+    },
   ]);
 }
 

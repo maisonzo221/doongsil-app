@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from 'expo-sqlite/kv-store';
 import { ItemId, ITEMS, MedalId } from '../data/missions';
 import { applyMissionComplete, BearState, CompleteResult, currentTier, Equipped, isAutoSatisfied, SwimStats } from '../utils/missionLogic';
+import { track } from '../services/analytics';
 
 export type { BearState, CompleteResult, Equipped, SwimStats } from '../utils/missionLogic';
 export { EMPTY_STATS, swimStatsFrom, autoValue } from '../utils/missionLogic';
@@ -67,7 +68,10 @@ export function useBearState(): BearState {
 export async function completeMission(missionId: string): Promise<CompleteResult | null> {
   const state = await getBearState();
   const result = applyMissionComplete(state, missionId);
-  if (result) await save(result.state);
+  if (result) {
+    await save(result.state);
+    track('mission_completed', { mission_id: missionId, tier_completed: !!result.tierCompleted });
+  }
   return result;
 }
 

@@ -7,6 +7,7 @@ import BrandMark from '../components/BrandMark';
 import AppleLogo from '../components/AppleLogo';
 import { colors, fonts, radius, spacing } from '../theme';
 import { continueAsGuest, signInWithApple, syncContacts, UserProfile } from '../storage/auth';
+import { track } from '../services/analytics';
 
 interface Props {
   onAuthenticated: (user: UserProfile) => void;
@@ -26,6 +27,7 @@ export default function AuthScreen({ onAuthenticated }: Props) {
         return;
       }
       const user = await signInWithApple();
+      track('sign_in', { method: 'apple' });
       setPendingUser(user);
       setStep('contacts');
     } catch (err: any) {
@@ -41,6 +43,7 @@ export default function AuthScreen({ onAuthenticated }: Props) {
     setLoading(true);
     try {
       const user = await continueAsGuest();
+      track('guest_start');
       onAuthenticated(user);
     } finally {
       setLoading(false);
