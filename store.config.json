@@ -1,0 +1,55 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 둥실",
+    "release": {
+      "automaticRelease": false
+    },
+    "categories": [
+      "HEALTH_AND_FITNESS",
+      "LIFESTYLE"
+    ],
+    "info": {
+      "ko": {
+        "title": "둥실 - 수영의 거의 모든 것",
+        "subtitle": "나만의 감성 수영 다이어리",
+        "description": "둥실은 숫자와 기록보다 \"오늘 물속에서 어땠는지\"를 남기는 감성 수영 다이어리예요.\n\n🌊 캘린더\n오늘의 수영을 기분·종목·거리·시간과 함께 기록하고, 달력으로 한눈에 돌아보세요.\n애플 건강(HealthKit) 연동으로 운동 기록을 자동으로 불러올 수 있어요.\n\n📍 가이드\n- 수영장 찾기: 행정안전부·서울 열린데이터광장 공공데이터 기반, 전국 수영장의 운영시간·\n  요금·레일 수·자유수영 안내까지 실제 정보로 확인하고 지도에서 바로 찾아가세요.\n- 자유게시판: 수영 이야기를 자유롭게 나누세요.\n- 자유수영: 자유수영 시간 정보를 모아봤어요.\n\n🏊 수친\n연락처 기반으로 수영 친구를 찾고, 수톡(오픈채팅)과 톡톡(수영 모임)으로 소통하세요.\n\n🎬 티칭\n수영 관련 인기 영상을 매일 아침·저녁 새로 모아 보여드려요.\n\n로그인은 Apple 계정만으로 간편하게, 불필요한 개인정보는 요구하지 않아요.\n\n이용약관: https://maisonzo221.github.io/doongsil-app/terms.html\n개인정보 처리방침: https://maisonzo221.github.io/doongsil-app/privacy.html",
+        "keywords": [
+          "수영",
+          "수영일기",
+          "수영기록",
+          "수영다이어리",
+          "수영장찾기",
+          "자유수영",
+          "수영친구",
+          "수영모임",
+          "물놀이",
+          "스윔"
+        ],
+        "promoText": "오늘 물속에서 어땠는지, 숫자보다 느낌으로 남기는 수영 다이어리. 전국 공공 수영장 정보와 수영 친구들까지 한 곳에서.",
+        "releaseNotes": "둥실의 첫 출시예요. 수영 기록 캘린더, 곰 꾸미기와 미션, 전국 수영장 찾기, 수친·수톡을 만나보세요.",
+        "supportUrl": "https://maisonzo221.github.io/doongsil-app/support.html",
+        "privacyPolicyUrl": "https://maisonzo221.github.io/doongsil-app/privacy.html"
+      }
+    },
+    "advisory": {
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "gambling": false,
+      "unrestrictedWebAccess": false,
+      "kidsAgeBand": null,
+      "ageRatingOverride": "NONE",
+      "koreaAgeRatingOverride": "NONE"
+    }
+  }
+}

@@ -54,7 +54,7 @@
 개인정보 처리방침: https://maisonzo221.github.io/doongsil-app/privacy.html
 ```
 
-## 키워드 (100바이트 이내, 쉼표 구분)
+## 키워드 (100자 이내, 쉼표 구분)
 
 ```
 수영,수영일기,수영기록,수영다이어리,수영장찾기,자유수영,수영친구,수영모임,물놀이,스윔
@@ -128,3 +128,12 @@ App Store Connect → 앱 → **App Privacy**. 아래는 코드와 서버 구조
 - **광고 데이터, 구매 내역, 검색 기록, 사진·영상**: 해당 없음.
 
 개인정보 처리방침(`docs/privacy.html`)에도 같은 내용이 반영되어 있어요.
+
+
+## 문구를 한 번에 올리기 (EAS Metadata)
+
+저장소 루트의 `store.config.json`에 이름, 부제, 설명, 키워드, 프로모션 문구, 지원·개인정보 URL, 새로운 내용, 카테고리, 저작권, 출시 방식(수동), 연령 등급 기본값이 들어 있어요.
+Mac에서 `cd ~/doongsil-app && npx eas-cli metadata:push` 를 실행하면 App Store Connect에 올라가요. (빌드를 먼저 올려 처리가 끝나 있어야 해요.)
+
+EAS Metadata가 **못 하는 것**(App Store Connect 화면에서 직접): 스크린샷, App Privacy, 가격·국가, 빌드 선택, 콘텐츠 권한, 심사 연락처·메모, 연령 등급 설문의 사용자 콘텐츠·메시지 문항, 심사 제출.
+화면에서 고친 뒤에 다시 push하면 덮어써질 수 있으니, 화면에서 수정했다면 먼저 `npx eas-cli metadata:pull` 을 하세요.
