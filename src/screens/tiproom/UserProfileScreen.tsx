@@ -11,6 +11,8 @@ import { addFriendById, isFriend } from '../../storage/social';
 import { getCommentCountByAuthor, getPostCountByAuthor } from '../../storage/tipRoom';
 import { getProfileStats, ProfileStats } from '../../storage/profileStats';
 import { swimTenureLabel } from '../../utils/swimTenure';
+import ReportSheet, { ReportTarget } from '../../components/ReportSheet';
+import { unblockUser, useBlockedIds } from '../../storage/safety';
 
 type Props = NativeStackScreenProps<TipRoomStackParamList, 'UserProfile'>;
 
@@ -29,6 +31,8 @@ export default function UserProfileScreen({ route }: Props) {
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingFriend, setAddingFriend] = useState(false);
+  const blocked = useBlockedIds();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -147,7 +151,31 @@ export default function UserProfileScreen({ route }: Props) {
         {!isMe && !friend && (
           <Text style={styles.hint}>수친이 되면 평균 수영 데이터도 볼 수 있어요.</Text>
         )}
+
+        {!isMe && (
+          <View style={styles.safetyRow}>
+            {blocked.has(userId) ? (
+              <TouchableOpacity
+                style={styles.safetyBtn}
+                onPress={() =>
+                  unblockUser(userId).catch(() => Alert.alert('해제 실패', '잠시 후 다시 시도해주세요.'))
+                }
+              >
+                <Text style={styles.safetyBtnText}>차단 해제하기</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.safetyBtn}
+                onPress={() => setReportTarget({ type: 'user', userId, userName: profile.nicknameKo })}
+              >
+                <Text style={styles.safetyBtnText}>신고·차단하기</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
+
+      <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
     </ScreenBackground>
   );
 }
@@ -178,6 +206,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.xs,
   },
+  safetyRow: { marginTop: spacing.md },
+  safetyBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  safetyBtnText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 13, textDecorationLine: 'underline' },
   addFriendBtnText: { fontFamily: fonts.semibold, color: colors.white, fontSize: 14 },
   statsCard: {
     marginTop: spacing.lg,

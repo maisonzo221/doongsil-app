@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, radius, spacing } from '../theme';
 import type { ChatMessage } from '../storage/social';
@@ -23,6 +23,8 @@ interface Props {
   onAnimated: (rowKey: string) => void;
   /** 이 메시지를 아직 안 읽은 사람 수 (카카오톡처럼 말풍선 옆에 숫자로). 0이면 표시하지 않는다. */
   unread?: number;
+  /** 말풍선을 길게 눌렀을 때 (다른 사람 메시지의 신고·차단). 없으면 길게 눌러도 아무 일이 없다. */
+  onLongPress?: (item: ChatMessage) => void;
 }
 
 // 말풍선 "밖"(바로 아래)에서 피어나는 작은 공기방울. 말풍선 위로 올라가 겹치지 않고, 아래에서 살짝 떠오르다 사라진다.
@@ -74,7 +76,7 @@ function BubbleDots({ mine }: { mine: boolean }) {
   );
 }
 
-function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated, unread = 0 }: Props) {
+function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated, unread = 0, onLongPress }: Props) {
   const animate = fresh && !reduceMotion;
   const rise = useRef(new Animated.Value(animate ? 0 : 1)).current;
   const wobble = useRef(new Animated.Value(0)).current;
@@ -121,7 +123,11 @@ function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated, un
       {!mine && <Text style={styles.sender}>{nickname}</Text>}
       <View style={[styles.line, mine ? styles.lineMine : styles.lineOther]}>
         {mine && unread > 0 && <Text style={[styles.unread, styles.unreadMine]}>{unread}</Text>}
-        <View style={styles.bubbleOuter}>
+        <Pressable
+          style={styles.bubbleOuter}
+          delayLongPress={350}
+          onLongPress={!mine && onLongPress ? () => onLongPress(item) : undefined}
+        >
           <Animated.View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleOther, bubbleStyle as object]}>
             {/* 비눗방울처럼 투명한 유리 느낌: 반투명 색 + 무지개빛 번짐 + 윗쪽 반사광 */}
             <LinearGradient
@@ -143,7 +149,7 @@ function MessageBubbleBase({ item, mine, nickname, fresh, rowKey, onAnimated, un
             )}
           </Animated.View>
           {dots && <BubbleDots mine={mine} />}
-        </View>
+        </Pressable>
         {!mine && unread > 0 && <Text style={[styles.unread, styles.unreadOther]}>{unread}</Text>}
       </View>
     </View>

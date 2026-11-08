@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,6 +19,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { useTabBarClearance } from '../../utils/useTabBarClearance';
+import ReportSheet, { ReportTarget } from '../../components/ReportSheet';
+import { useBlockedIds } from '../../storage/safety';
 import MessageBubble from '../../components/MessageBubble';
 import { useLeaveRoom } from '../../components/LeaveRoomFlow';
 import { MembersIcon } from '../../components/icons/TabIcons';
@@ -60,6 +62,9 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [members, setMembers] = useState<Record<string, Friend>>({});
   // 메뉴바 가운데 언덕이 입력창을 가리지 않게, 키보드가 내려가 있을 때 입력창을 그만큼 띄운다.
   const tabClearance = useTabBarClearance();
+  // 차단한 사람의 메시지는 숨기고, 다른 사람의 메시지를 길게 누르면 신고·차단 시트가 뜬다.
+  const blocked = useBlockedIds();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // 멤버별로 어디까지 읽었는지 — 말풍선 옆 "안 읽은 사람 수" 계산용.
   const [readers, setReaders] = useState<MemberReadState[]>([]);
@@ -255,6 +260,22 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
     return members[senderId]?.nicknameKo ?? '알 수 없음';
   }
 
+  const visibleMessages = useMemo(() => messages.filter((m) => !blocked.has(m.senderId)), [messages, blocked]);
+
+  const handleBubbleLongPress = useCallback(
+    (m: ChatMessage) => {
+      if (m.senderId === myId) return;
+      setReportTarget({
+        type: 'message',
+        id: m.id,
+        userId: m.senderId,
+        userName: members[m.senderId]?.nicknameKo ?? '알 수 없음',
+        text: m.text ?? m.sharedSummary,
+      });
+    },
+    [myId, members]
+  );
+
   function handleKick(member: Friend) {
     Alert.alert('강퇴하기', `${member.nicknameKo}님을 이 ${roomLabel}방에서 강퇴할까요?`, [
       { text: '취소', style: 'cancel' },
@@ -314,12 +335,13 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{groupName}</Text>
+          <Text style={styles.safetyHint}>다른 사람의 메시지를 길게 누르면 신고·차단할 수 있어요</Text>
         </View>
 
         <FlatList
           ref={listRef}
           style={styles.flex}
-          data={messages}
+          data={visibleMessages}
           extraData={readers}
           keyExtractor={(m) => m.localKey ?? m.id}
           contentContainerStyle={styles.list}
@@ -346,6 +368,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
                 rowKey={rowKey}
                 onAnimated={handleAnimated}
                 unread={unreadReaderCount(item, readers)}
+                onLongPress={handleBubbleLongPress}
               />
             );
           }}
@@ -375,6 +398,8 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
 
       {leaveElement}
 
+      <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
+
       <Modal visible={memberModal} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -392,14 +417,26 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
                     </Text>
                     {item.id === ownerId && <Text style={styles.ownerCrown}>👑</Text>}
                   </View>
-                  {isOwner && item.id !== myId && (
+                  {item.id !== myId && (
                     <View style={styles.memberActions}>
-                      <TouchableOpacity onPress={() => handleTransfer(item)}>
-                        <Text style={styles.memberActionText}>위임</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setMemberModal(false);
+                          setReportTarget({ type: 'user', userId: item.id, userName: item.nicknameKo });
+                        }}
+                      >
+                        <Text style={styles.memberActionTextMuted}>신고·차단</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => handleKick(item)}>
-                        <Text style={styles.memberActionTextDanger}>강퇴</Text>
-                      </TouchableOpacity>
+                      {isOwner && (
+                        <>
+                          <TouchableOpacity onPress={() => handleTransfer(item)}>
+                            <Text style={styles.memberActionText}>위임</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleKick(item)}>
+                            <Text style={styles.memberActionTextDanger}>강퇴</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   )}
                 </View>
@@ -471,6 +508,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xs },
   headerTitle: { fontFamily: fonts.bold, fontSize: 18, color: colors.text },
+  safetyHint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted, marginTop: 2 },
   headerAction: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -553,6 +591,7 @@ const styles = StyleSheet.create({
   memberName: { fontFamily: fonts.semibold, color: colors.text, fontSize: 14 },
   ownerCrown: { fontSize: 13 },
   memberActions: { flexDirection: 'row', gap: spacing.sm },
+  memberActionTextMuted: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 12 },
   memberActionText: { fontFamily: fonts.semibold, color: colors.blueSea, fontSize: 12 },
   memberActionTextDanger: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },
   inviteRow: { flexDirection: 'row', gap: spacing.hairline, marginTop: spacing.sm },

@@ -25,6 +25,7 @@ import {
   createBoardPost,
   getBoardPosts,
 } from '../../storage/tipRoom';
+import { useBlockedIds } from '../../storage/safety';
 import {
   findPoolsNear,
   getDefaultOfficialPools,
@@ -92,6 +93,9 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
   const [tab, setTab] = useState<Tab>('board');
   const [me, setMe] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<BoardPost[]>([]);
+  // 차단한 사람의 글은 목록에서 숨긴다.
+  const blocked = useBlockedIds();
+  const visiblePosts = useMemo(() => posts.filter((p) => !blocked.has(p.authorId)), [posts, blocked]);
   const [poolSearch, setPoolSearch] = useState('');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const favorites = useFavoritePools();
@@ -367,8 +371,8 @@ export default function TipRoomHomeScreen({ navigation }: Props) {
             <TouchableOpacity style={styles.addRow} onPress={() => setPostModal(true)}>
               <Text style={styles.addRowText}>+ 글쓰기</Text>
             </TouchableOpacity>
-            {posts.length === 0 && <Text style={styles.empty}>아직 글이 없어요. 첫 글을 남겨보세요.</Text>}
-            {posts.map((p) => (
+            {visiblePosts.length === 0 && <Text style={styles.empty}>아직 글이 없어요. 첫 글을 남겨보세요.</Text>}
+            {visiblePosts.map((p) => (
               <TouchableOpacity
                 key={p.id}
                 style={styles.postCard}

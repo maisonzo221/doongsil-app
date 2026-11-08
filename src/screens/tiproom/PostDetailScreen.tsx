@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -15,6 +15,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ScreenBackground from '../../components/ScreenBackground';
 import { useTabBarClearance } from '../../utils/useTabBarClearance';
+import ReportSheet, { ReportTarget } from '../../components/ReportSheet';
+import { useBlockedIds } from '../../storage/safety';
 import { colors, fonts, radius, spacing } from '../../theme';
 import { TipRoomStackParamList } from '../../navigation/tipRoomTypes';
 import {
@@ -45,6 +47,10 @@ export default function PostDetailScreen({ route, navigation }: Props) {
   const [comments, setComments] = useState<BoardComment[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [draft, setDraft] = useState('');
+  // 차단한 사람의 글·댓글은 숨기고, 다른 사람의 글·댓글은 "신고"로 신고·차단할 수 있다.
+  const blocked = useBlockedIds();
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const visibleComments = useMemo(() => comments.filter((c) => !blocked.has(c.authorId)), [comments, blocked]);
 
   const reload = useCallback(async () => {
     const [user, posts, commentList] = await Promise.all([
@@ -105,6 +111,7 @@ export default function PostDetailScreen({ route, navigation }: Props) {
   if (!post) return <ScreenBackground><View /></ScreenBackground>;
 
   const isAuthor = post.authorId === me?.id;
+  const postBlocked = blocked.has(post.authorId);
   // 일반 사용자는 본인 글이고 댓글이 없을 때만 삭제 가능. 관리자는 항상 가능
   // (댓글 있는 글은 위에서 한 번 더 확인받는다).
   const canDelete = me?.isAdmin || (isAuthor && comments.length === 0);
@@ -116,15 +123,33 @@ export default function PostDetailScreen({ route, navigation }: Props) {
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryBadgeText}>{post.category}</Text>
           </View>
-          <Text style={styles.title}>{post.title}</Text>
-          <View style={styles.metaRow}>
-            <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: post.authorId })}>
-              <Text style={styles.metaAuthor}>{post.authorNickname}</Text>
-            </TouchableOpacity>
-            <Text style={styles.meta}> · {timeAgo(post.createdAt)}</Text>
-          </View>
-          {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.postImage} />}
-          <Text style={styles.body}>{post.body}</Text>
+          {postBlocked ? (
+            <View style={styles.blockedNotice}>
+              <Text style={styles.blockedNoticeText}>차단한 사용자의 글이에요. 설정의 "차단한 사용자"에서 해제할 수 있어요.</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.title}>{post.title}</Text>
+              <View style={styles.metaRow}>
+                <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: post.authorId })}>
+                  <Text style={styles.metaAuthor}>{post.authorNickname}</Text>
+                </TouchableOpacity>
+                <Text style={styles.meta}> · {timeAgo(post.createdAt)}</Text>
+                {!isAuthor && (
+                  <TouchableOpacity
+                    style={styles.reportBtn}
+                    onPress={() =>
+                      setReportTarget({ type: 'post', id: post.id, userId: post.authorId, userName: post.authorNickname, text: `${post.title}\n${post.body}` })
+                    }
+                  >
+                    <Text style={styles.reportBtnText}>신고·차단</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.postImage} />}
+              <Text style={styles.body}>{post.body}</Text>
+            </>
+          )}
 
           {canDelete && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDeletePost}>
@@ -132,12 +157,22 @@ export default function PostDetailScreen({ route, navigation }: Props) {
             </TouchableOpacity>
           )}
 
-          <Text style={styles.commentTitle}>댓글 {comments.length}</Text>
-          {comments.map((c) => (
+          <Text style={styles.commentTitle}>댓글 {visibleComments.length}</Text>
+          {visibleComments.map((c) => (
             <View key={c.id} style={styles.commentRow}>
-              <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: c.authorId })}>
-                <Text style={styles.commentAuthor}>{c.authorNickname}</Text>
-              </TouchableOpacity>
+              <View style={styles.commentHead}>
+                <TouchableOpacity onPress={() => navigation.navigate('UserProfile', { userId: c.authorId })}>
+                  <Text style={styles.commentAuthor}>{c.authorNickname}</Text>
+                </TouchableOpacity>
+                {c.authorId !== me?.id && (
+                  <TouchableOpacity
+                    style={styles.reportBtn}
+                    onPress={() => setReportTarget({ type: 'comment', id: c.id, userId: c.authorId, userName: c.authorNickname, text: c.body })}
+                  >
+                    <Text style={styles.reportBtnText}>신고·차단</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <Text style={styles.commentBody}>{c.body}</Text>
             </View>
           ))}
@@ -156,6 +191,8 @@ export default function PostDetailScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
     </ScreenBackground>
   );
 }
@@ -184,6 +221,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cardSoft,
   },
   body: { fontFamily: fonts.regular, color: colors.text, fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
+  reportBtn: { marginLeft: 'auto', paddingHorizontal: spacing.hairline, paddingVertical: 2 },
+  reportBtnText: { fontFamily: fonts.semibold, color: colors.textMuted, fontSize: 11 },
+  commentHead: { flexDirection: 'row', alignItems: 'center' },
+  blockedNotice: { backgroundColor: colors.cardSoft, borderRadius: radius.md, padding: spacing.sm, marginTop: spacing.xs },
+  blockedNoticeText: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 13, lineHeight: 20 },
   deleteBtn: { alignSelf: 'flex-start', marginTop: spacing.sm },
   deleteBtnText: { fontFamily: fonts.semibold, color: '#D96C6C', fontSize: 12 },
   commentTitle: {

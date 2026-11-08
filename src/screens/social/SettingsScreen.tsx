@@ -239,6 +239,10 @@ export default function SettingsScreen({ navigation }: Props) {
           </View>
         )}
 
+        <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('BlockedUsers')}>
+          <Text style={styles.rowText}>차단한 사용자</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.row} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}>
           <Text style={styles.rowText}>개인정보 처리방침</Text>
         </TouchableOpacity>

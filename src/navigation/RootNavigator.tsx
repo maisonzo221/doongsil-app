@@ -17,6 +17,7 @@ import AuthScreen from '../screens/AuthScreen';
 import FriendsScreen from '../screens/social/FriendsScreen';
 import ChatRoomScreen from '../screens/social/ChatRoomScreen';
 import SettingsScreen from '../screens/social/SettingsScreen';
+import BlockedUsersScreen from '../screens/social/BlockedUsersScreen';
 import BearCustomizeScreen from '../screens/BearCustomizeScreen';
 import { CalendarIcon, FriendsIcon, ShopIcon, TeachingIcon, TipRoomIcon } from '../components/icons/TabIcons';
 import WaterTabBar from '../components/WaterTabBar';
@@ -103,6 +104,11 @@ function FriendsStackNavigator() {
         name="Settings"
         component={SettingsScreen}
         options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+      />
+      <FriendsStack.Screen
+        name="BlockedUsers"
+        component={BlockedUsersScreen}
+        options={{ headerShown: true, title: '차단한 사용자', headerBackButtonDisplayMode: 'minimal' }}
       />
     </FriendsStack.Navigator>
   );
