@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -132,9 +133,13 @@ export default function SettingsScreen({ navigation }: Props) {
 
   return (
     <ScreenBackground>
-      <View style={styles.container}>
-        <Text style={styles.title}>설정</Text>
-
+      {/* 행이 늘어도 아래가 잘리지 않게 스크롤되고, 맨 아래에 메뉴바(가운데 언덕)와 겹치지 않을 여백을 둔다. */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        showsVerticalScrollIndicator={false}
+      >
         {me && me.provider === 'apple' && (
           <View style={styles.card}>
             {/* 닉네임·초대 코드는 왼쪽에, 내 캐릭터는 오른쪽에(캘린더 화면처럼). 꾸미기 버튼은 캐릭터 바로 아래. */}
@@ -292,14 +297,13 @@ export default function SettingsScreen({ navigation }: Props) {
             <Text style={[styles.rowText, styles.dangerText]}>계정 삭제</Text>
           )}
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
-  title: { fontSize: 28, fontFamily: fonts.bold, color: colors.text, marginBottom: spacing.lg },
+  container: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xxl },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

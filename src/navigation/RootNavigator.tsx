@@ -104,7 +104,7 @@ function FriendsStackNavigator() {
       <FriendsStack.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ headerShown: true, title: '', headerBackButtonDisplayMode: 'minimal' }}
+        options={{ headerShown: true, title: '설정', headerBackButtonDisplayMode: 'minimal' }}
       />
       <FriendsStack.Screen
         name="BlockedUsers"
