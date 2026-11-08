@@ -8,6 +8,7 @@ import ScreenBackground from '../components/ScreenBackground';
 import WaterDrop from '../components/WaterDrop';
 import RecordCard from '../components/RecordCard';
 import MissionCard from '../components/MissionCard';
+import DailyTrendCard from '../components/DailyTrendCard';
 import BearSprite from '../components/bear/BearSprite';
 import ActivityRings, { MiniActivityRing } from '../components/ActivityRings';
 import RoutineRecommendations from '../components/RoutineRecommendations';
@@ -224,6 +225,8 @@ export default function CalendarScreen({ navigation }: Props) {
             }}
           />
         </View>
+
+        {records.length > 0 && <DailyTrendCard records={records} />}
 
         <View style={styles.distanceCard}>
           <Text style={styles.distanceText}>{distanceLabel}</Text>
