@@ -266,6 +266,86 @@ export async function getGroupMembers(groupId: string): Promise<Friend[]> {
     .map((p: any) => ({ id: p.id, nicknameKo: p.nickname_ko, nicknameEn: p.nickname_en }));
 }
 
+// ---- 방 검색 (수톡·톡톡) ----
+
+export interface GroupMatch {
+  /** 방 이름에 검색어가 들어 있다 */
+  byName: boolean;
+  /** 검색어가 이름에 들어 있는 멤버들 */
+  memberNames: string[];
+  /** 검색어가 들어 있는 대화 수 (차단한 사람의 메시지는 뺀다) */
+  messageCount: number;
+  /** 가장 최근에 검색어가 나온 대화 */
+  snippet?: string;
+}
+
+/** LIKE 패턴의 특수문자(\ % _)를 글자 그대로 찾도록 막는다. */
+function escapeLike(q: string): string {
+  return q.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * 내가 들어 있는 방(groups) 중에서 방 이름, 멤버 이름, 대화 내용에 검색어가 들어 있는 방을 찾는다.
+ * 내용은 RLS로 내가 속한 방의 것만 읽힌다. 검색어와 맞는 방만 결과 맵에 들어간다.
+ */
+export async function searchGroups(
+  groups: ChatGroup[],
+  query: string,
+  blocked: Set<string>
+): Promise<Map<string, GroupMatch>> {
+  const result = new Map<string, GroupMatch>();
+  const q = query.trim();
+  if (!q || groups.length === 0) return result;
+  const lower = q.toLowerCase();
+  const ids = groups.map((g) => g.id);
+  const entry = (id: string): GroupMatch => {
+    let m = result.get(id);
+    if (!m) {
+      m = { byName: false, memberNames: [], messageCount: 0 };
+      result.set(id, m);
+    }
+    return m;
+  };
+
+  for (const g of groups) {
+    if (g.name.toLowerCase().includes(lower)) entry(g.id).byName = true;
+  }
+
+  const [memberRes, messageRes] = await Promise.all([
+    supabase
+      .from('chat_group_members')
+      .select('group_id, profiles(nickname_ko, nickname_en)')
+      .in('group_id', ids),
+    supabase
+      .from('chat_messages')
+      .select('group_id, sender_id, text, created_at')
+      .in('group_id', ids)
+      .eq('type', 'text')
+      .ilike('text', `%${escapeLike(q)}%`)
+      .order('created_at', { ascending: false })
+      .limit(500),
+  ]);
+
+  for (const row of (memberRes.data ?? []) as any[]) {
+    const p = row.profiles;
+    if (!p) continue;
+    const names = [p.nickname_ko, p.nickname_en].filter(Boolean) as string[];
+    if (names.some((n) => n.toLowerCase().includes(lower))) {
+      const m = entry(row.group_id);
+      const shown = p.nickname_ko || p.nickname_en;
+      if (!m.memberNames.includes(shown)) m.memberNames.push(shown);
+    }
+  }
+
+  for (const row of (messageRes.data ?? []) as any[]) {
+    if (blocked.has(row.sender_id) || !row.text) continue;
+    const m = entry(row.group_id);
+    m.messageCount += 1;
+    if (!m.snippet) m.snippet = row.text; // 최신순이라 처음 나온 것이 가장 최근
+  }
+  return result;
+}
+
 // ---- 채팅 메시지 ----
 
 export async function getMessages(groupId: string): Promise<ChatMessage[]> {

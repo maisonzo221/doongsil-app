@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -25,15 +25,37 @@ import {
   getGroupById,
   getGroups,
   getUnreadCounts,
+  GroupMatch,
   inviteLinkFor,
   joinGroupByInviteCode,
+  searchGroups,
   subscribeToAnyNewMessage,
 } from '../../storage/social';
+import { useBlockedIds } from '../../storage/safety';
 import { getCurrentUser, UserProfile } from '../../storage/auth';
 
 interface Props {
   kind: RoomKind;
   navigation: NativeStackNavigationProp<FriendsStackParamList>;
+  /** 위쪽 검색창에 적은 말. 있으면 방 이름·대화 내용·멤버 이름이 맞는 방만 보여준다. */
+  query?: string;
+}
+
+/** 검색어가 들어 있는 부분을 굵게 보여준다(처음 한 곳). 긴 대화는 검색어 앞뒤만 잘라서 보여준다. */
+function Highlighted({ text, q, style }: { text: string; q: string; style: object }) {
+  const i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (i < 0) return <Text style={style} numberOfLines={1}>{text}</Text>;
+  const start = Math.max(0, i - 12);
+  const end = Math.min(text.length, i + q.length + 24);
+  return (
+    <Text style={style} numberOfLines={1}>
+      {start > 0 ? '…' : ''}
+      {text.slice(start, i)}
+      <Text style={styles.matchStrong}>{text.slice(i, i + q.length)}</Text>
+      {text.slice(i + q.length, end)}
+      {end < text.length ? '…' : ''}
+    </Text>
+  );
 }
 
 const KIND_LABEL: Record<RoomKind, string> = { sutok: '수톡', toktok: '톡톡' };
@@ -42,11 +64,15 @@ const KIND_DESC: Record<RoomKind, string> = {
   toktok: '수영 관련 모임을 만들고 운영하는 방이에요.',
 };
 
-export default function GroupsScreen({ kind, navigation }: Props) {
+export default function GroupsScreen({ kind, navigation, query = '' }: Props) {
   const label = KIND_LABEL[kind];
   const [me, setMe] = useState<UserProfile | null>(null);
   const [groups, setGroups] = useState<ChatGroup[]>([]);
   const [unread, setUnread] = useState<Record<string, number>>({});
+  const blocked = useBlockedIds();
+  const q = query.trim();
+  // 검색 결과: 검색어가 있을 때만 값이 있다. 입력이 멈춘 뒤(0.3초)에 서버에서 찾는다.
+  const [matches, setMatches] = useState<Map<string, GroupMatch> | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [createModal, setCreateModal] = useState(false);
   const [joinModal, setJoinModal] = useState(false);
@@ -83,6 +109,26 @@ export default function GroupsScreen({ kind, navigation }: Props) {
   );
 
   const disabled = !me || me.provider !== 'apple';
+
+  useEffect(() => {
+    if (!q) {
+      setMatches(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchGroups(groups, q, blocked).then((m) => {
+        if (!cancelled) setMatches(m);
+      });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [q, groups, blocked]);
+
+  const searching = q.length > 0;
+  const shownGroups = searching ? groups.filter((g) => matches?.has(g.id)) : groups;
 
   async function openCreateModal() {
     setFriends(await getFriends());
@@ -155,10 +201,12 @@ export default function GroupsScreen({ kind, navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={groups}
+          data={shownGroups}
           keyExtractor={(g) => g.id}
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
+            searching ? null : (
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.addRow} onPress={openCreateModal}>
                 <Text style={styles.addRowText}>+ {label} 만들기</Text>
@@ -167,6 +215,7 @@ export default function GroupsScreen({ kind, navigation }: Props) {
                 <Text style={styles.addRowText}>코드로 참여</Text>
               </TouchableOpacity>
             </View>
+            )
           }
           renderItem={({ item }) => {
             const card = (
@@ -192,7 +241,24 @@ export default function GroupsScreen({ kind, navigation }: Props) {
                     {/* 제목 반대편 오른쪽 끝: 안 읽은 메시지 수 (하늘색 물방울) */}
                     <UnreadBubble count={unread[item.id] ?? 0} />
                   </View>
-                  <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
+                  {searching ? (
+                    <View style={styles.matchBox}>
+                      {matches?.get(item.id)?.snippet ? (
+                        <View style={styles.hitRow}>
+                          <Text style={styles.matchLabel}>대화 {matches.get(item.id)!.messageCount}건</Text>
+                          <Highlighted text={matches.get(item.id)!.snippet!} q={q} style={styles.matchText} />
+                        </View>
+                      ) : null}
+                      {matches?.get(item.id)?.memberNames.length ? (
+                        <View style={styles.hitRow}>
+                          <Text style={styles.matchLabel}>멤버</Text>
+                          <Highlighted text={matches.get(item.id)!.memberNames.join(', ')} q={q} style={styles.matchText} />
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <Text style={styles.groupCode}>코드: {item.inviteCode}</Text>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.shareBtn} onPress={() => handleShareInvite(item)}>
                   <Text style={styles.shareBtnText}>초대 링크 공유</Text>
@@ -232,7 +298,13 @@ export default function GroupsScreen({ kind, navigation }: Props) {
               </View>
             );
           }}
-          ListEmptyComponent={<Text style={styles.empty}>아직 {label}이 없어요.</Text>}
+          ListEmptyComponent={
+            searching ? (
+              <Text style={styles.empty}>{matches ? `"${q}"에 맞는 ${label}이 없어요.` : '찾는 중이에요…'}</Text>
+            ) : (
+              <Text style={styles.empty}>아직 {label}이 없어요.</Text>
+            )
+          }
         />
       )}
 
@@ -310,6 +382,11 @@ export default function GroupsScreen({ kind, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  matchBox: { marginTop: 4, gap: 2 },
+  hitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.hairline },
+  matchLabel: { fontFamily: fonts.bold, color: colors.blueSea, fontSize: 11 },
+  matchText: { flex: 1, fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12 },
+  matchStrong: { fontFamily: fonts.bold, color: colors.text },
   container: { flex: 1 },
   description: {
     fontFamily: fonts.regular,

@@ -76,6 +76,10 @@ export default function FriendsScreen({ navigation, route }: Props) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const favoriteIds = useFavoriteFriendIds();
+  // 탭을 바꾸거나(밀어서 넘기는 것 포함) 검색창을 닫으면 검색어를 비운다 — 다른 탭의 검색어가 남아 목록이 비어 보이지 않게.
+  useEffect(() => {
+    setQuery('');
+  }, [subTab, searchOpen]);
 
   // 카카오톡처럼: 즐겨찾는 친구 → (분류별) 친구 순서로, 제목 옆에 인원수를 보여주고 접었다 펼 수 있다.
   const sections = useMemo(() => {
@@ -302,7 +306,7 @@ export default function FriendsScreen({ navigation, route }: Props) {
             </View>
           </TouchableOpacity>
           <View style={styles.headerIcons}>
-            <TouchableOpacity hitSlop={8} onPress={() => setSearchOpen((v) => !v)} accessibilityLabel="친구 검색">
+            <TouchableOpacity hitSlop={8} onPress={() => setSearchOpen((v) => !v)} accessibilityLabel="검색">
               <SearchIcon color={colors.text} size={26} />
             </TouchableOpacity>
             <TouchableOpacity hitSlop={8} onPress={() => setAddModal(true)} accessibilityLabel="수친 추가">
@@ -322,28 +326,32 @@ export default function FriendsScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        {/* 검색창: 수친 탭은 이름, 수톡·톡톡 탭은 방 이름·대화 내용·멤버 이름으로 찾는다. */}
+        {searchOpen && (
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder={subTab === 'friends' ? '이름으로 친구 찾기' : '방 이름·대화 내용·멤버 이름으로 찾기'}
+            placeholderTextColor={colors.textMuted}
+            autoFocus
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        )}
+
         {/* 수톡 탭에서는 방을 밀어서 나가는 동작과 겹치므로, 좌우로 밀어 탭을 넘기는 기능을 끈다. */}
         <View style={styles.flex} {...(subTab === 'sutok' ? {} : tabPanResponder.panHandlers)}>
           {subTab === 'sutok' ? (
-            <GroupsScreen kind="sutok" navigation={navigation} />
+            <GroupsScreen kind="sutok" navigation={navigation} query={searchOpen ? query : ''} />
           ) : subTab === 'toktok' ? (
-            <GroupsScreen kind="toktok" navigation={navigation} />
+            <GroupsScreen kind="toktok" navigation={navigation} query={searchOpen ? query : ''} />
           ) : disabled ? (
             <View style={styles.disabledNotice}>
               <Text style={styles.disabledText}>수친 기능은 Apple 로그인 계정에서만 사용할 수 있어요.</Text>
             </View>
           ) : (
             <>
-              {searchOpen && (
-                <TextInput
-                  style={styles.searchInput}
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="이름으로 친구 찾기"
-                  placeholderTextColor={colors.textMuted}
-                  autoFocus
-                />
-              )}
               <SectionList
                 sections={sections}
                 keyExtractor={(f) => f.id}
